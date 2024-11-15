@@ -57,6 +57,23 @@
       <artifactId>jersey-hk2</artifactId>
       <version>3.1.9</version>
     </dependency>
+    <dependency>
+      <groupId>org.glassfish.jersey.media</groupId>
+      <artifactId>jersey-media-json-jackson</artifactId>
+      <version>3.1.9</version>
+    </dependency>
+
+    <!-- JAXB Dependencies -->
+    <dependency>
+      <groupId>jakarta.xml.bind</groupId>
+      <artifactId>jakarta.xml.bind-api</artifactId>
+      <version>4.0.0</version>
+    </dependency>
+    <dependency>
+      <groupId>org.glassfish.jaxb</groupId>
+      <artifactId>jaxb-runtime</artifactId>
+      <version>4.0.0</version>
+    </dependency>
 
     <!-- JAX-RS API -->
     <dependency>
