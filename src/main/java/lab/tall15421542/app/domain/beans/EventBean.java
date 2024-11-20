@@ -1,20 +1,27 @@
 package lab.tall15421542.app.domain.beans;
 
+import lab.tall15421542.lab.app.avro.event.CreateEvent;
+import lab.tall15421542.lab.app.avro.event.Area;
 import java.util.ArrayList;
+import java.time.Instant;
 
 public class EventBean {
     private String eventName;
     private String artist;
-    private ArrayList<Area> areas;
+    private ArrayList<AreaBean> areaBeans;
+    private Instant reservationOpeningTime;
+    private Instant reservationClosingTime;
+    private Instant eventStartTime;
+    private Instant eventEndTime;
 
     public EventBean(){
 
     }
 
-    public EventBean(String eventName, String artist, ArrayList<Area> areas){
+    public EventBean(String eventName, String artist, ArrayList<AreaBean> areaBeans){
         this.eventName = eventName;
         this.artist = artist;
-        this.areas = areas;
+        this.areaBeans = areaBeans;
     }
 
     public String getEventName() {
@@ -25,9 +32,17 @@ public class EventBean {
         return artist;
     }
 
-    public ArrayList<Area> getAreas() {
-        return areas;
+    public ArrayList<AreaBean> getAreaBeans() {
+        return areaBeans;
     }
+
+    public Instant getReservationOpeningTime() { return reservationOpeningTime; }
+
+    public Instant getReservationClosingTime() { return reservationClosingTime; }
+
+    public Instant getEventStartTime() { return eventStartTime; }
+
+    public Instant getEventEndTime() { return eventEndTime; }
 
     public void setEventName(String eventName) {
         this.eventName = eventName;
@@ -37,7 +52,25 @@ public class EventBean {
         this.artist = artist;
     }
 
-    public void setAreas(ArrayList<Area> areas) {
-        this.areas = areas;
+    public void setAreaBeans(ArrayList<AreaBean> areaBeans) {
+        this.areaBeans = areaBeans;
+    }
+
+    public void setReservationOpeningTime(Instant timestamp) { this.reservationOpeningTime = timestamp; }
+
+    public void setReservationClosingTime(Instant timestamp) { this.reservationClosingTime = timestamp; }
+
+    public void setEventStartTime(Instant timestamp) { this.eventStartTime = timestamp; }
+
+    public void setEventEndTime(Instant timestamp) { this.eventEndTime = timestamp; }
+
+    public CreateEvent toAvro(){
+        ArrayList<Area> areas = new ArrayList<>();
+        for(AreaBean areaBean: areaBeans){
+            areas.add(areaBean.toAvro());
+        }
+        return new CreateEvent(
+            this.artist, this.eventName, this.reservationOpeningTime, this.reservationClosingTime, this.eventStartTime, this.eventEndTime, areas
+        );
     }
 }
