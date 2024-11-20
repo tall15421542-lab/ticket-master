@@ -15,13 +15,13 @@ public class EventBean {
     private Instant eventEndTime;
 
     public EventBean(){
-
-    }
-
-    public EventBean(String eventName, String artist, ArrayList<AreaBean> areaBeans){
-        this.eventName = eventName;
-        this.artist = artist;
-        this.areaBeans = areaBeans;
+        eventName = new String();
+        artist = new String();
+        areaBeans = new ArrayList<>();
+        reservationOpeningTime = Instant.now();
+        reservationClosingTime = Instant.now();
+        eventStartTime = Instant.now();
+        eventEndTime = Instant.now();
     }
 
     public String getEventName() {
