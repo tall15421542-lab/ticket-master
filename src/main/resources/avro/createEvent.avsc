@@ -1,0 +1,46 @@
+[
+    {
+        "type": "record",
+        "name": "Area",
+        "namespace": "lab.tall15421542.lab.app.avro.event",
+        "fields": [
+            { "name": "areaId", "type": "string" },
+            { "name": "price", "type": "int" },
+            { "name": "rowCount", "type": "int" },
+            { "name": "colCount", "type": "int" }
+        ]
+    },
+    {
+        "type": "record",
+        "name": "CreateEvent",
+        "namespace": "lab.tall15421542.lab.app.avro.event",
+        "fields": [
+            { "name": "artist", "type": "string" },
+            { "name": "eventName", "type": "string" },
+            {
+                "name": "reservationOpeningTime",
+                "type": { "type": "long", "logicalType": "timestamp-millis" }
+            },
+            {
+                "name": "reservationClosingTime",
+                "type": { "type": "long", "logicalType": "timestamp-millis" }
+            },
+            {
+                "name": "eventStartTime",
+                "type": { "type": "long", "logicalType": "timestamp-millis" }
+            },
+            {
+                "name": "eventEndTime",
+                "type": { "type": "long", "logicalType": "timestamp-millis" }
+            },
+            {
+                "name": "areas",
+                "type": {
+                    "type": "array",
+                    "items": "Area"
+                },
+                "default": []
+            }
+        ]
+    }
+]
