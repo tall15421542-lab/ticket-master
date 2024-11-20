@@ -1,6 +1,8 @@
 package lab.tall15421542.app;
 
 import lab.tall15421542.app.domain.beans.EventBean;
+import lab.tall15421542.app.domain.Schemas;
+import lab.tall15421542.lab.app.avro.event.CreateEvent;
 
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletContextHandler;
@@ -21,15 +23,29 @@ import jakarta.ws.rs.container.AsyncResponse;
 import jakarta.ws.rs.container.Suspended;
 import jakarta.ws.rs.core.MediaType;
 
+import static io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG;
+
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.clients.producer.ProducerConfig;
+
+import java.util.Properties;
+
 @Path("v1")
 public class TicketService {
+    private KafkaProducer<String, CreateEvent> producer;
 
     public static void main(final String[] args) {
+        Properties config = new Properties();
+        config.put(SCHEMA_REGISTRY_URL_CONFIG, "http://localhost:8081");
+        Schemas.configureSerdes(config);
+
         final TicketService service = new TicketService();
-        service.start();
+        service.start("localhost:29092,localhost:39092,localhost:49092", config);
     }
 
-    public void start(){
+    public void start(String bootstrapServers, Properties config){
+        producer = startProducer(bootstrapServers, Schemas.Topics.CREATE_EVENT, config);
         startJetty(4403, this);
     }
 
@@ -49,6 +65,8 @@ public class TicketService {
     @Produces({MediaType.APPLICATION_JSON})
     public void createEvent(final EventBean eventBean,
                          @Suspended final AsyncResponse asyncResponse) {
+        CreateEvent req = eventBean.toAvro();
+        producer.send(new ProducerRecord<String, CreateEvent>(Schemas.Topics.CREATE_EVENT.name(), req.getEventName().toString(), req));
         asyncResponse.resume(eventBean);
     }
 
@@ -75,5 +93,21 @@ public class TicketService {
         }
 
         return jettyServer;
+    }
+
+    public static <T> KafkaProducer startProducer(final String bootstrapServers,
+                                                  final Schemas.Topic<String, T> topic,
+                                                  final Properties defaultConfig) {
+        final Properties producerConfig = new Properties();
+        producerConfig.putAll(defaultConfig);
+        producerConfig.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        producerConfig.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, "true");
+        producerConfig.put(ProducerConfig.RETRIES_CONFIG, String.valueOf(Integer.MAX_VALUE));
+        producerConfig.put(ProducerConfig.ACKS_CONFIG, "all");
+        producerConfig.put(ProducerConfig.CLIENT_ID_CONFIG, "create-event-sender");
+
+        return new KafkaProducer<>(producerConfig,
+                topic.keySerde().serializer(),
+                topic.valueSerde().serializer());
     }
 }
