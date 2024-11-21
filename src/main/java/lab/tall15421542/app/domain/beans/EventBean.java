@@ -8,7 +8,7 @@ import java.time.Instant;
 public class EventBean {
     private String eventName;
     private String artist;
-    private ArrayList<AreaBean> areaBeans;
+    private ArrayList<AreaBean> areas;
     private Instant reservationOpeningTime;
     private Instant reservationClosingTime;
     private Instant eventStartTime;
@@ -17,7 +17,7 @@ public class EventBean {
     public EventBean(){
         eventName = new String();
         artist = new String();
-        areaBeans = new ArrayList<>();
+        areas = new ArrayList<>();
         reservationOpeningTime = Instant.now();
         reservationClosingTime = Instant.now();
         eventStartTime = Instant.now();
@@ -32,8 +32,8 @@ public class EventBean {
         return artist;
     }
 
-    public ArrayList<AreaBean> getAreaBeans() {
-        return areaBeans;
+    public ArrayList<AreaBean> getAreas() {
+        return areas;
     }
 
     public Instant getReservationOpeningTime() { return reservationOpeningTime; }
@@ -52,8 +52,8 @@ public class EventBean {
         this.artist = artist;
     }
 
-    public void setAreaBeans(ArrayList<AreaBean> areaBeans) {
-        this.areaBeans = areaBeans;
+    public void setAreas(ArrayList<AreaBean> areas) {
+        this.areas = areas;
     }
 
     public void setReservationOpeningTime(Instant timestamp) { this.reservationOpeningTime = timestamp; }
@@ -65,12 +65,12 @@ public class EventBean {
     public void setEventEndTime(Instant timestamp) { this.eventEndTime = timestamp; }
 
     public CreateEvent toAvro(){
-        ArrayList<Area> areas = new ArrayList<>();
-        for(AreaBean areaBean: areaBeans){
-            areas.add(areaBean.toAvro());
+        ArrayList<Area> avro_areas = new ArrayList<>();
+        for(AreaBean areaBean: areas){
+            avro_areas.add(areaBean.toAvro());
         }
         return new CreateEvent(
-            this.artist, this.eventName, this.reservationOpeningTime, this.reservationClosingTime, this.eventStartTime, this.eventEndTime, areas
+            this.artist, this.eventName, this.reservationOpeningTime, this.reservationClosingTime, this.eventStartTime, this.eventEndTime, avro_areas
         );
     }
 }
