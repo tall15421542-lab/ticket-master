@@ -2,7 +2,7 @@
     {
         "type": "record",
         "name": "Area",
-        "namespace": "lab.tall15421542.lab.app.avro.event",
+        "namespace": "lab.tall15421542.app.avro.event",
         "fields": [
             { "name": "areaId", "type": "string" },
             { "name": "price", "type": "int" },
@@ -13,7 +13,7 @@
     {
         "type": "record",
         "name": "CreateEvent",
-        "namespace": "lab.tall15421542.lab.app.avro.event",
+        "namespace": "lab.tall15421542.app.avro.event",
         "fields": [
             { "name": "artist", "type": "string" },
             { "name": "eventName", "type": "string" },
