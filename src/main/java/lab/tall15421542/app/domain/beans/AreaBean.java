@@ -1,6 +1,6 @@
 package lab.tall15421542.app.domain.beans;
 
-import lab.tall15421542.lab.app.avro.event.Area;
+import lab.tall15421542.app.avro.event.Area;
 
 public class AreaBean {
     private String areaId;

@@ -2,7 +2,7 @@ package lab.tall15421542.app;
 
 import lab.tall15421542.app.domain.beans.EventBean;
 import lab.tall15421542.app.domain.Schemas;
-import lab.tall15421542.lab.app.avro.event.CreateEvent;
+import lab.tall15421542.app.avro.event.CreateEvent;
 
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletContextHandler;

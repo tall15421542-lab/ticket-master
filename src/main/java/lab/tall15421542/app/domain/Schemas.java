@@ -1,6 +1,6 @@
 package lab.tall15421542.app.domain;
 
-import lab.tall15421542.lab.app.avro.event.CreateEvent;
+import lab.tall15421542.app.avro.event.CreateEvent;
 
 import io.confluent.kafka.streams.serdes.avro.SpecificAvroSerde;
 
