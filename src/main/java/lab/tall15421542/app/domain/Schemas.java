@@ -15,7 +15,6 @@ import java.util.HashMap;
 import java.util.Properties;
 
 public class Schemas{
-    public static SpecificAvroSerde<CreateEvent> CREATE_EVENT_VALUE_SERDE = new SpecificAvroSerde<>();
     public static class Topic<K,V>{
         private final String name;
         private final Serde<K> keySerde;
@@ -72,7 +71,6 @@ public class Schemas{
             configureSerde(topic.keySerde(), config, true);
             configureSerde(topic.valueSerde(), config, false);
         }
-        configureSerde(CREATE_EVENT_VALUE_SERDE, config, false);
     }
 
     private static void configureSerde(final Serde<?> serde, final Properties config, final Boolean isKey) {
