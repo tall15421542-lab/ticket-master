@@ -11,6 +11,13 @@
 ``docker-compose up -d``
 
 ### Check Topic Message
+#### Install kafka-avro-console-consumer
+```
+curl -O https://packages.confluent.io/archive/7.7/confluent-community-7.7.1.tar.gz
+tar xzf confluent-community-7.7.1.tar.gz
+```
+
+#### Check Topic Message command
 ```
 ./kafka-avro-console-consumer \
   --bootstrap-server localhost:29092 \
