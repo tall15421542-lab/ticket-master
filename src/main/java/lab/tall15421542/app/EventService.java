@@ -1,5 +1,6 @@
 package lab.tall15421542.app;
 
+import org.apache.kafka.common.utils.Bytes;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.kstream.Produced;
@@ -10,6 +11,9 @@ import org.apache.kafka.streams.KafkaStreams.State;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.Topology;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.common.serialization.Serdes;
+import org.apache.kafka.streams.state.KeyValueStore;
+import org.apache.kafka.streams.kstream.Materialized;
 
 import static io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG;
 
@@ -17,6 +21,7 @@ import java.io.InputStreamReader;
 import java.io.BufferedReader;
 
 import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
@@ -26,6 +31,8 @@ import lab.tall15421542.app.domain.Schemas;
 import lab.tall15421542.app.domain.Schemas.Topics;
 import lab.tall15421542.app.avro.event.CreateEvent;
 import lab.tall15421542.app.avro.event.Area;
+import lab.tall15421542.app.avro.event.AreaStatus;
+import lab.tall15421542.app.avro.event.SeatStatus;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,6 +40,22 @@ import org.slf4j.LoggerFactory;
 public class EventService {
     private static final Logger log = LoggerFactory.getLogger(EventService.class);
 
+    private static AreaStatus toAreaStatus(String eventName, Area area){
+        String areaId = area.getAreaId().toString();
+        int rowCount = area.getRowCount(), colCount = area.getColCount();
+        int availableSeats = rowCount * colCount;
+        List<List<SeatStatus>> seats = new ArrayList<>();
+        for(int i = 0 ; i < rowCount ; ++i){
+            List<SeatStatus> row = new ArrayList<>();
+            for(int j = 0 ; j < colCount ; ++j){
+                row.add(j, new SeatStatus(i, j, true));
+            }
+            seats.add(row);
+        }
+        return new AreaStatus(
+                eventName, areaId, area.getPrice(), rowCount, colCount, availableSeats, seats
+        );
+    }
     public static void main(final String[] args) throws Exception {
         Properties config = new Properties();
         config.put(SCHEMA_REGISTRY_URL_CONFIG, "http://localhost:8081");
@@ -42,19 +65,20 @@ public class EventService {
         KStream<String, CreateEvent> createEventReqs = builder.stream(Topics.CREATE_EVENT.name(),
                         Consumed.with(Topics.CREATE_EVENT.keySerde(), Topics.CREATE_EVENT.valueSerde()));
 
-        KStream<String, Area> createEventAreas = createEventReqs.flatMap(
+        KStream<String, AreaStatus> createEventAreas = createEventReqs.flatMap(
                 (eventName, createEvent) -> {
-                    System.out.println(createEvent);
-                    List<KeyValue<String, Area>> areas = new LinkedList<>();
+                    List<KeyValue<String, AreaStatus>> areas = new LinkedList<>();
                     for(Area area: createEvent.getAreas()){
-                        areas.add(KeyValue.pair(eventName + area.getAreaId(), area));
+                        areas.add(KeyValue.pair(eventName + "#" + area.getAreaId(), toAreaStatus(eventName, area)));
                     }
                     return areas;
                 }
         );
 
-        createEventAreas.peek(
-                (areaId, area) -> { log.info(areaId + " " + area); }
+        createEventAreas.toTable(
+                Materialized.<String, AreaStatus, KeyValueStore<Bytes, byte[]>>as(Schemas.Stores.AREA_STATUS.name())
+                        .withKeySerde(Schemas.Stores.AREA_STATUS.keySerde())
+                        .withValueSerde(Schemas.Stores.AREA_STATUS.valueSerde())
         );
 
         final Topology topology = builder.build();

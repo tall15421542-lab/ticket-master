@@ -138,7 +138,7 @@
       <artifactId>kafka-streams</artifactId>
       <version>3.9.0</version>
     </dependency>
-    
+
     <!-- Test Dependencies -->
     <dependency>
       <groupId>org.junit.jupiter</groupId>
