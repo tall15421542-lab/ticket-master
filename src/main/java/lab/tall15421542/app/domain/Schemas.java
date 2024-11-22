@@ -1,6 +1,7 @@
 package lab.tall15421542.app.domain;
 
 import lab.tall15421542.app.avro.event.CreateEvent;
+import lab.tall15421542.app.avro.event.AreaStatus;
 
 import io.confluent.kafka.streams.serdes.avro.SpecificAvroSerde;
 
@@ -57,6 +58,47 @@ public class Schemas{
         }
     }
 
+    public static class Store<K,V>{
+        private final String name;
+        private final Serde<K> keySerde;
+        private final Serde<V> valueSerde;
+
+        Store(final String name, final Serde<K> keySerde, final Serde<V> valueSerde){
+            this.name = name;
+            this.keySerde = keySerde;
+            this.valueSerde = valueSerde;
+        }
+
+        public Serde<K> keySerde() {
+            return keySerde;
+        }
+
+        public Serde<V> valueSerde() {
+            return valueSerde;
+        }
+
+        public String name() {
+            return this.name;
+        }
+
+        public String toString() {
+            return this.name;
+        }
+    }
+
+    public static class Stores {
+        public final static Map<String, Store<?, ?>> ALL = new HashMap<>();
+        public static Store<String, AreaStatus> AREA_STATUS;
+
+        static {
+            createStores();
+        }
+
+        private static void createStores(){
+            AREA_STATUS = new Store<>("AreaStatus", Serdes.String(), new SpecificAvroSerde<>());
+            ALL.put("AreaStatus", AREA_STATUS);
+        }
+    }
 
     public static Map<String, ?> buildSchemaRegistryConfigMap(final Properties config) {
         final HashMap<String, String> map = new HashMap<>();
@@ -70,6 +112,12 @@ public class Schemas{
         for (final Topic<?, ?> topic : Topics.ALL.values()) {
             configureSerde(topic.keySerde(), config, true);
             configureSerde(topic.valueSerde(), config, false);
+        }
+
+        Stores.createStores(); //wipe cached schema registry
+        for(final Store<?, ?> store: Stores.ALL.values()){
+            configureSerde(store.keySerde(), config, true);
+            configureSerde(store.valueSerde(), config, false);
         }
     }
 
