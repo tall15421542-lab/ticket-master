@@ -2,6 +2,7 @@ package lab.tall15421542.app.domain;
 
 import lab.tall15421542.app.avro.event.CreateEvent;
 import lab.tall15421542.app.avro.event.AreaStatus;
+import lab.tall15421542.app.avro.reservation.ReserveSeat;
 
 import io.confluent.kafka.streams.serdes.avro.SpecificAvroSerde;
 
@@ -47,6 +48,7 @@ public class Schemas{
     public static class Topics {
         public final static Map<String, Topic<?, ?>> ALL = new HashMap<>();
         public static Topic<String, CreateEvent> CREATE_EVENT;
+        public static Topic<String, ReserveSeat> RESERVE_SEAT;
 
         static {
             createTopics();
@@ -55,6 +57,9 @@ public class Schemas{
         private static void createTopics(){
             CREATE_EVENT = new Topic<>("createEvent", Serdes.String(), new SpecificAvroSerde<>());
             ALL.put("createEvent", CREATE_EVENT);
+
+            RESERVE_SEAT = new Topic<>("reserveSeat", Serdes.String(), new SpecificAvroSerde<>());
+            ALL.put("reserveSeat", RESERVE_SEAT);
         }
     }
 
