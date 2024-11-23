@@ -33,6 +33,7 @@ import lab.tall15421542.app.avro.event.CreateEvent;
 import lab.tall15421542.app.avro.event.Area;
 import lab.tall15421542.app.avro.event.AreaStatus;
 import lab.tall15421542.app.avro.event.SeatStatus;
+import lab.tall15421542.app.avro.reservation.ReserveSeat;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,6 +63,8 @@ public class EventService {
         Schemas.configureSerdes(config);
 
         final StreamsBuilder builder = new StreamsBuilder();
+
+        // Create Event Flow
         KStream<String, CreateEvent> createEventReqs = builder.stream(Topics.CREATE_EVENT.name(),
                         Consumed.with(Topics.CREATE_EVENT.keySerde(), Topics.CREATE_EVENT.valueSerde()));
 
@@ -79,6 +82,16 @@ public class EventService {
                 Materialized.<String, AreaStatus, KeyValueStore<Bytes, byte[]>>as(Schemas.Stores.AREA_STATUS.name())
                         .withKeySerde(Schemas.Stores.AREA_STATUS.keySerde())
                         .withValueSerde(Schemas.Stores.AREA_STATUS.valueSerde())
+        );
+
+        // Reservation Flow
+        KStream<String, ReserveSeat> reserveSeatReqs = builder.stream(Topics.RESERVE_SEAT.name(),
+                Consumed.with(Topics.RESERVE_SEAT.keySerde(), Topics.RESERVE_SEAT.valueSerde()));
+
+        reserveSeatReqs.peek(
+                (eventAreaId, reserveSeat) -> {
+                    System.out.println(reserveSeat);
+                }
         );
 
         final Topology topology = builder.build();
