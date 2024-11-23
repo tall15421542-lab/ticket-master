@@ -1,0 +1,22 @@
+{
+  "type": "record",
+  "name": "ReserveSeat",
+  "namespace": "lab.tall15421542.app.avro.reservation",
+  "fields": [
+    {"name": "reservationId", "type": "string"},
+    {"name": "eventId", "type": "string"},
+    {"name": "areaId", "type": "string"},
+    {"name": "numOfSeat", "type": "int"},
+    {"name": "seats", "type": {
+      "type": "array",
+      "items": {
+        "type": "record",
+        "name": "Seat",
+        "fields": [
+          {"name": "row", "type": "int"},
+          {"name": "col", "type": "int"}
+        ]
+      }
+    }}
+  ]
+}
