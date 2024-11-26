@@ -45,6 +45,9 @@ import lab.tall15421542.app.avro.event.AreaStatus;
 import lab.tall15421542.app.avro.event.SeatStatus;
 import lab.tall15421542.app.avro.reservation.ReserveSeat;
 import lab.tall15421542.app.avro.reservation.Seat;
+import lab.tall15421542.app.avro.reservation.ReservationResult;
+import lab.tall15421542.app.avro.reservation.ReservationResultEnum;
+import lab.tall15421542.app.avro.reservation.ReservationErrorCodeEnum;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,7 +72,7 @@ public class EventService {
         );
     }
 
-    private static class ReserveSeatTransformer implements Transformer<String, ReserveSeat, KeyValue<String, String>>{
+    private static class ReserveSeatTransformer implements Transformer<String, ReserveSeat, KeyValue<String, ReservationResult>>{
         private KeyValueStore<String, ValueAndTimestamp<AreaStatus>> areaStatusStore;
         @Override
         public void init(ProcessorContext context){
@@ -77,22 +80,39 @@ public class EventService {
         }
 
         @Override
-        public KeyValue<String, String> transform(String eventAreaId, ReserveSeat req){
+        public KeyValue<String, ReservationResult> transform(String eventAreaId, ReserveSeat req){
             ValueAndTimestamp<AreaStatus> areaStatusAndTimestamp = areaStatusStore.get(eventAreaId);
             AreaStatus areaStatus = ValueAndTimestamp.getValueOrNull(areaStatusAndTimestamp);
+            ReservationResult result = new ReservationResult();
+            String reservationId = req.getReservationId().toString();
+            result.setReservationId(reservationId);
+
             if(areaStatus == null){
-                return KeyValue.pair(eventAreaId, "this event area does not exist");
+                result.setResult(ReservationResultEnum.FAILED);
+                result.setErrorCode(ReservationErrorCodeEnum.INVALID_EVENT_AREA);
+                result.setErrorMessage(String.format("%s event area does not exist", eventAreaId));
+                return KeyValue.pair(reservationId, result);
             }
 
             for(Seat seat: req.getSeats()){
                 int row = seat.getRow(), col = seat.getCol();
                 int areaRowCount = areaStatus.getRowCount(), areaColCount = areaStatus.getColCount();
                 if(row < 0 || row >= areaRowCount || col < 0 || col >= areaColCount){
-                    return KeyValue.pair(eventAreaId, String.format("Invalid seats included (%d, %d)", row, col));
+                    result.setResult(ReservationResultEnum.FAILED);
+                    result.setErrorCode(ReservationErrorCodeEnum.INVALID_SEAT);
+                    result.setErrorMessage(
+                            String.format("%s (%d, %d) is not a valid seat.", eventAreaIdrow, col, eventAreaId)
+                    );
+                    return KeyValue.pair(reservationId, result);
                 }
 
                 if(areaStatus.getSeats().get(row).get(col).getIsAvailable() == false){
-                    return KeyValue.pair(eventAreaId, String.format("Unavailabl Seat (%d, %d)", row, col));
+                    result.setResult(ReservationResultEnum.FAILED);
+                    result.setErrorCode(ReservationErrorCodeEnum.NOT_AVAILABLE);
+                    result.setErrorMessage(
+                            String.format("%s (%d, %d) is unavailable.", eventAreaId, row, col, eventAreaId)
+                    );
+                    return KeyValue.pair(reservationId, result);
                 }
             }
 
@@ -102,8 +122,9 @@ public class EventService {
             }
 
             areaStatusStore.put(eventAreaId, areaStatusAndTimestamp);
+            result.setResult(ReservationResultEnum.SUCCESS);
 
-            return KeyValue.pair(eventAreaId, String.format("Reservation %s succeeds", req.getReservationId()));
+            return KeyValue.pair(reservationId, result);
         }
 
         @Override
@@ -142,13 +163,16 @@ public class EventService {
         KStream<String, ReserveSeat> reserveSeatReqs = builder.stream(Topics.RESERVE_SEAT.name(),
                 Consumed.with(Topics.RESERVE_SEAT.keySerde(), Topics.RESERVE_SEAT.valueSerde()));
 
-        KStream<String, String> reserveResult = reserveSeatReqs.transform(new TransformerSupplier() {
+        KStream<String, ReservationResult> reserveResult = reserveSeatReqs.transform(new TransformerSupplier() {
             public Transformer get() {
                 return new ReserveSeatTransformer();
             }
         }, Schemas.Stores.AREA_STATUS.name());
 
-        reserveResult.peek((eventAreaId, msg) -> System.out.printf("%s: %s", eventAreaId, msg));
+        reserveResult.to(Topics.RESERVATION_RESULT.name(), Produced.with(
+                Topics.RESERVATION_RESULT.keySerde(),
+                Topics.RESERVATION_RESULT.valueSerde()
+        ));
 
         final Topology topology = builder.build();
         System.out.println(topology.describe());
