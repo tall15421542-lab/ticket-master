@@ -1,8 +1,10 @@
 package lab.tall15421542.app;
 
 import lab.tall15421542.app.domain.beans.EventBean;
+import lab.tall15421542.app.domain.beans.ReservationBean;
 import lab.tall15421542.app.domain.Schemas;
 import lab.tall15421542.app.avro.event.CreateEvent;
+import lab.tall15421542.app.avro.reservation.ReserveSeat;
 
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletContextHandler;
@@ -33,7 +35,8 @@ import java.util.Properties;
 
 @Path("v1")
 public class TicketService {
-    private KafkaProducer<String, CreateEvent> producer;
+    private KafkaProducer<String, CreateEvent> createEventProducer;
+    private KafkaProducer<String, ReserveSeat> reserveSeatProducer;
 
     public static void main(final String[] args) {
         Properties config = new Properties();
@@ -45,7 +48,8 @@ public class TicketService {
     }
 
     public void start(String bootstrapServers, Properties config){
-        producer = startProducer(bootstrapServers, Schemas.Topics.CREATE_EVENT, config);
+        createEventProducer = startProducer(bootstrapServers, Schemas.Topics.CREATE_EVENT, config);
+        reserveSeatProducer = startProducer(bootstrapServers, Schemas.Topics.RESERVE_SEAT, config);
         startJetty(4403, this);
     }
 
@@ -66,10 +70,22 @@ public class TicketService {
     public void createEvent(final EventBean eventBean,
                          @Suspended final AsyncResponse asyncResponse) {
         CreateEvent req = eventBean.toAvro();
-        producer.send(new ProducerRecord<String, CreateEvent>(Schemas.Topics.CREATE_EVENT.name(), req.getEventName().toString(), req));
+        createEventProducer.send(new ProducerRecord<String, CreateEvent>(Schemas.Topics.CREATE_EVENT.name(), req.getEventName().toString(), req));
         asyncResponse.resume(eventBean);
     }
 
+    @POST
+    @ManagedAsync
+    @Path("/event/{id}/reservation")
+    @Consumes({MediaType.APPLICATION_JSON})
+    @Produces({MediaType.APPLICATION_JSON})
+    public void createReservation(final ReservationBean reservationBean,
+                                  @Suspended final AsyncResponse asyncResponse){
+        ReserveSeat req = reservationBean.toAvro();
+        String eventAreaId = req.getEventId().toString() + "#" + req.getAreaId().toString();
+        reserveSeatProducer.send(new ProducerRecord<String, ReserveSeat>(Schemas.Topics.RESERVE_SEAT.name(), eventAreaId, req));
+        asyncResponse.resume(reservationBean);
+    }
 
     public static Server startJetty(final int port, final Object binding) {
         final ServletContextHandler context = new ServletContextHandler(ServletContextHandler.SESSIONS);
