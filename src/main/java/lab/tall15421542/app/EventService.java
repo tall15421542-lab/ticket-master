@@ -83,14 +83,7 @@ public class EventService {
             String eventAreaId = req.getEventId().toString() + "#" + req.getAreaId().toString();
             String reservationId = req.getReservationId().toString();
             result.setReservationId(reservationId);
-
-            if(areaStatus == null){
-                result.setResult(ReservationResultEnum.FAILED);
-                result.setErrorCode(ReservationErrorCodeEnum.INVALID_EVENT_AREA);
-                result.setErrorMessage(String.format("%s event area does not exist", eventAreaId));
-                return result;
-            }
-
+            
             for(Seat seat: req.getSeats()){
                 int row = seat.getRow(), col = seat.getCol();
                 int areaRowCount = areaStatus.getRowCount(), areaColCount = areaStatus.getColCount();
@@ -123,16 +116,8 @@ public class EventService {
     private static class ContinuousRandomStrategy implements ReservationStrategy{
         public ReservationResult reserve(AreaStatus areaStatus, ReserveSeat req){
             ReservationResult result = new ReservationResult();
-            String eventAreaId = req.getEventId().toString() + "#" + req.getAreaId().toString();
             String reservationId = req.getReservationId().toString();
             result.setReservationId(reservationId);
-
-            if(areaStatus == null){
-                result.setResult(ReservationResultEnum.FAILED);
-                result.setErrorCode(ReservationErrorCodeEnum.INVALID_EVENT_AREA);
-                result.setErrorMessage(String.format("%s event area does not exist", eventAreaId));
-                return result;
-            }
 
             if(req.getNumOfSeats() <= 0){
                 result.setResult(ReservationResultEnum.FAILED);
@@ -200,6 +185,15 @@ public class EventService {
             ValueAndTimestamp<AreaStatus> areaStatusAndTimestamp = areaStatusStore.get(eventAreaId);
             AreaStatus areaStatus = ValueAndTimestamp.getValueOrNull(areaStatusAndTimestamp);
             String reservationId = req.getReservationId().toString();
+
+            if(areaStatus == null){
+                ReservationResult result = new ReservationResult();
+                result.setReservationId(reservationId);
+                result.setResult(ReservationResultEnum.FAILED);
+                result.setErrorCode(ReservationErrorCodeEnum.INVALID_EVENT_AREA);
+                result.setErrorMessage(String.format("%s event area does not exist", eventAreaId));
+                return KeyValue.pair(reservationId, result);
+            }
 
             ReservationStrategy reservationStrategy = reservationStrategies.get(req.getType());
             if(reservationStrategy == null){
