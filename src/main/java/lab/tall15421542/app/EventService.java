@@ -34,6 +34,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.Map;
+import java.util.HashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -48,6 +49,7 @@ import lab.tall15421542.app.avro.reservation.Seat;
 import lab.tall15421542.app.avro.reservation.ReservationResult;
 import lab.tall15421542.app.avro.reservation.ReservationResultEnum;
 import lab.tall15421542.app.avro.reservation.ReservationErrorCodeEnum;
+import lab.tall15421542.app.avro.reservation.ReservationTypeEnum;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,18 +74,15 @@ public class EventService {
         );
     }
 
-    private static class ReserveSeatTransformer implements Transformer<String, ReserveSeat, KeyValue<String, ReservationResult>>{
-        private KeyValueStore<String, ValueAndTimestamp<AreaStatus>> areaStatusStore;
-        @Override
-        public void init(ProcessorContext context){
-            areaStatusStore = context.getStateStore(Schemas.Stores.AREA_STATUS.name());
-        }
+    private static interface ReservationStrategy {
+        ReservationResult reserve(AreaStatus areaStatus, ReserveSeat req);
+    }
 
+    private static class SelfPickStrategy implements ReservationStrategy{
         @Override
-        public KeyValue<String, ReservationResult> transform(String eventAreaId, ReserveSeat req){
-            ValueAndTimestamp<AreaStatus> areaStatusAndTimestamp = areaStatusStore.get(eventAreaId);
-            AreaStatus areaStatus = ValueAndTimestamp.getValueOrNull(areaStatusAndTimestamp);
+        public ReservationResult reserve(AreaStatus areaStatus, ReserveSeat req){
             ReservationResult result = new ReservationResult();
+            String eventAreaId = req.getEventId().toString() + "#" + req.getAreaId().toString();
             String reservationId = req.getReservationId().toString();
             result.setReservationId(reservationId);
 
@@ -91,7 +90,7 @@ public class EventService {
                 result.setResult(ReservationResultEnum.FAILED);
                 result.setErrorCode(ReservationErrorCodeEnum.INVALID_EVENT_AREA);
                 result.setErrorMessage(String.format("%s event area does not exist", eventAreaId));
-                return KeyValue.pair(reservationId, result);
+                return result;
             }
 
             for(Seat seat: req.getSeats()){
@@ -103,7 +102,7 @@ public class EventService {
                     result.setErrorMessage(
                             String.format("%s (%d, %d) is not a valid seat.", eventAreaId, row, col)
                     );
-                    return KeyValue.pair(reservationId, result);
+                    return result;
                 }
 
                 if(areaStatus.getSeats().get(row).get(col).getIsAvailable() == false){
@@ -112,19 +111,44 @@ public class EventService {
                     result.setErrorMessage(
                             String.format("%s (%d, %d) is unavailable.", eventAreaId, row, col, eventAreaId)
                     );
-                    return KeyValue.pair(reservationId, result);
+                    return result;
                 }
             }
 
-            for(Seat seat: req.getSeats()){
-                SeatStatus seatStatus = areaStatus.getSeats().get(seat.getRow()).get(seat.getCol());
-                seatStatus.setIsAvailable(false);
-            }
-
-            areaStatusStore.put(eventAreaId, areaStatusAndTimestamp);
             result.setResult(ReservationResultEnum.SUCCESS);
             result.setSeats(req.getSeats());
 
+            return result;
+        }
+    }
+
+    private static class ReserveSeatTransformer implements Transformer<String, ReserveSeat, KeyValue<String, ReservationResult>>{
+        private KeyValueStore<String, ValueAndTimestamp<AreaStatus>> areaStatusStore;
+        private Map<ReservationTypeEnum, ReservationStrategy> reservationStrategies;
+        @Override
+        public void init(ProcessorContext context){
+            areaStatusStore = context.getStateStore(Schemas.Stores.AREA_STATUS.name());
+            reservationStrategies = new HashMap<>();
+            reservationStrategies.put(ReservationTypeEnum.SELF_PICK, new SelfPickStrategy());
+        }
+
+        @Override
+        public KeyValue<String, ReservationResult> transform(String eventAreaId, ReserveSeat req){
+            ValueAndTimestamp<AreaStatus> areaStatusAndTimestamp = areaStatusStore.get(eventAreaId);
+            AreaStatus areaStatus = ValueAndTimestamp.getValueOrNull(areaStatusAndTimestamp);
+
+            ReservationStrategy reservationStrategy = reservationStrategies.get(req.getType());
+            ReservationResult result = reservationStrategy.reserve(areaStatus, req);
+
+            if(result.getResult() == ReservationResultEnum.SUCCESS){
+                for(Seat seat: result.getSeats()){
+                    SeatStatus seatStatus = areaStatus.getSeats().get(seat.getRow()).get(seat.getCol());
+                    seatStatus.setIsAvailable(false);
+                }
+                areaStatusStore.put(eventAreaId, areaStatusAndTimestamp);
+            }
+            
+            String reservationId = req.getReservationId().toString();
             return KeyValue.pair(reservationId, result);
         }
 
