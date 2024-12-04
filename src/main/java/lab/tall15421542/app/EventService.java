@@ -101,7 +101,7 @@ public class EventService {
                     result.setResult(ReservationResultEnum.FAILED);
                     result.setErrorCode(ReservationErrorCodeEnum.INVALID_SEAT);
                     result.setErrorMessage(
-                            String.format("%s (%d, %d) is not a valid seat.", eventAreaIdrow, col, eventAreaId)
+                            String.format("%s (%d, %d) is not a valid seat.", eventAreaId, row, col)
                     );
                     return KeyValue.pair(reservationId, result);
                 }
@@ -123,6 +123,7 @@ public class EventService {
 
             areaStatusStore.put(eventAreaId, areaStatusAndTimestamp);
             result.setResult(ReservationResultEnum.SUCCESS);
+            result.setSeats(req.getSeats());
 
             return KeyValue.pair(reservationId, result);
         }

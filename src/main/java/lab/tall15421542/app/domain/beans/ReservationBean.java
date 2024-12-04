@@ -2,6 +2,7 @@ package lab.tall15421542.app.domain.beans;
 
 import lab.tall15421542.app.avro.reservation.ReserveSeat;
 import lab.tall15421542.app.avro.reservation.Seat;
+import lab.tall15421542.app.avro.reservation.ReservationTypeEnum;
 
 import java.util.List;
 import java.util.ArrayList;
@@ -12,6 +13,7 @@ public class ReservationBean {
     private String areaId;
     private int numOfSeat;
     private List<SeatBean> seats;
+    private String type;
 
     // Getters and Setters
 
@@ -53,6 +55,14 @@ public class ReservationBean {
 
     public void setSeats(List<SeatBean> seats) {
         this.seats = seats;
+    }
+
+    public String getType() {
+        return type;
+    }
+
+    public void setType (String type){
+        this.type = type;
     }
 
     // Inner Seat class for the seats array
@@ -98,6 +108,12 @@ public class ReservationBean {
             }
         }
         avroReserveSeat.put("seats", avroSeats);
+
+        try{
+            avroReserveSeat.put("type", ReservationTypeEnum.valueOf(this.type));
+        }catch(IllegalArgumentException | NullPointerException e){
+            avroReserveSeat.put("type", ReservationTypeEnum.INVALID);
+        }
 
         return avroReserveSeat;
     }

@@ -13,6 +13,13 @@
             }
         },
         {
+            "name": "seats",
+            "type": ["null", {
+                "type": "array",
+                "items": "Seat"
+            }]
+        },
+        {
             "name": "errorCode",
             "type": ["null", {
                 "type": "enum",
