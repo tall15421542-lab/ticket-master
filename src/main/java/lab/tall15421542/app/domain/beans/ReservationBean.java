@@ -11,7 +11,7 @@ public class ReservationBean {
     private String reservationId;
     private String eventId;
     private String areaId;
-    private int numOfSeat;
+    private int numOfSeats;
     private List<SeatBean> seats;
     private String type;
 
@@ -41,12 +41,12 @@ public class ReservationBean {
         this.areaId = areaId;
     }
 
-    public int getNumOfSeat() {
-        return numOfSeat;
+    public int getNumOfSeats() {
+        return numOfSeats;
     }
 
-    public void setNumOfSeat(int numOfSeat) {
-        this.numOfSeat = numOfSeat;
+    public void setNumOfSeats(int numOfSeat) {
+        this.numOfSeats = numOfSeat;
     }
 
     public List<SeatBean> getSeats() {
@@ -95,7 +95,7 @@ public class ReservationBean {
         avroReserveSeat.setReservationId(this.reservationId);
         avroReserveSeat.setEventId(this.eventId);
         avroReserveSeat.setAreaId(this.areaId);
-        avroReserveSeat.setNumOfSeat(this.numOfSeat);
+        avroReserveSeat.setNumOfSeats(this.numOfSeats);
 
         // Convert the list of Seat objects to an Avro array
         List<Seat> avroSeats = new ArrayList<>();
