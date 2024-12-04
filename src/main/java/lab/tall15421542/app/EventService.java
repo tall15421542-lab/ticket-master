@@ -120,7 +120,7 @@ public class EventService {
         }
     }
 
-    private static class ContinousRandomStrategy implements ReservationStrategy{
+    private static class ContinuousRandomStrategy implements ReservationStrategy{
         public ReservationResult reserve(AreaStatus areaStatus, ReserveSeat req){
             ReservationResult result = new ReservationResult();
             String eventAreaId = req.getEventId().toString() + "#" + req.getAreaId().toString();
@@ -137,7 +137,7 @@ public class EventService {
             if(req.getNumOfSeats() <= 0){
                 result.setResult(ReservationResultEnum.FAILED);
                 result.setErrorCode(ReservationErrorCodeEnum.INVALID_ARGUMENT);
-                result.setErrorMessage(String.format("%d continous seats is invalid", req.getNumOfSeats()));
+                result.setErrorMessage(String.format("%d continuous seats is invalid", req.getNumOfSeats()));
                 return result;
             }
 
@@ -192,7 +192,7 @@ public class EventService {
             areaStatusStore = context.getStateStore(Schemas.Stores.AREA_STATUS.name());
             reservationStrategies = new HashMap<>();
             reservationStrategies.put(ReservationTypeEnum.SELF_PICK, new SelfPickStrategy());
-            reservationStrategies.put(ReservationTypeEnum.RANDOM, new ContinousRandomStrategy());
+            reservationStrategies.put(ReservationTypeEnum.RANDOM, new ContinuousRandomStrategy());
         }
 
         @Override
