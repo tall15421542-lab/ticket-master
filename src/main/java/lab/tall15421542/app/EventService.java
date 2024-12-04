@@ -29,6 +29,7 @@ import static io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig.SCHE
 import java.io.InputStreamReader;
 import java.io.BufferedReader;
 
+import java.time.Instant;
 import java.util.LinkedList;
 import java.util.ArrayList;
 import java.util.List;
@@ -83,7 +84,7 @@ public class EventService {
             String eventAreaId = req.getEventId().toString() + "#" + req.getAreaId().toString();
             String reservationId = req.getReservationId().toString();
             result.setReservationId(reservationId);
-            
+
             for(Seat seat: req.getSeats()){
                 int row = seat.getRow(), col = seat.getCol();
                 int areaRowCount = areaStatus.getRowCount(), areaColCount = areaStatus.getColCount();
@@ -212,7 +213,7 @@ public class EventService {
                     SeatStatus seatStatus = areaStatus.getSeats().get(seat.getRow()).get(seat.getCol());
                     seatStatus.setIsAvailable(false);
                 }
-                areaStatusStore.put(eventAreaId, areaStatusAndTimestamp);
+                areaStatusStore.put(eventAreaId, ValueAndTimestamp.make(areaStatus, Instant.now().toEpochMilli()));
             }
 
             return KeyValue.pair(reservationId, result);
