@@ -24,7 +24,7 @@
             "type": ["null", {
                 "type": "enum",
                 "name": "ReservationErrorCodeEnum",
-                "symbols": ["INVALID_EVENT_AREA", "INVALID_SEAT", "NOT_AVAILABLE", "INTERNAL_ERROR"]
+                "symbols": ["INVALID_EVENT_AREA", "INVALID_SEAT", "NOT_AVAILABLE", "INTERNAL_ERROR", "INVALID_ARGUMENT"]
             }],
             "default": null
         },

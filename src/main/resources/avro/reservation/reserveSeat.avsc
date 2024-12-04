@@ -6,7 +6,8 @@
     {"name": "reservationId", "type": "string"},
     {"name": "eventId", "type": "string"},
     {"name": "areaId", "type": "string"},
-    {"name": "numOfSeat", "type": "int"},
+    {"name": "numOfSeats", "type": "int", "default": 0},
+    {"name": "numOfSeat", "type": "int", "default": 0},
     {
       "name": "type",
       "type": {
