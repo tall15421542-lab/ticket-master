@@ -199,8 +199,18 @@ public class EventService {
         public KeyValue<String, ReservationResult> transform(String eventAreaId, ReserveSeat req){
             ValueAndTimestamp<AreaStatus> areaStatusAndTimestamp = areaStatusStore.get(eventAreaId);
             AreaStatus areaStatus = ValueAndTimestamp.getValueOrNull(areaStatusAndTimestamp);
+            String reservationId = req.getReservationId().toString();
 
             ReservationStrategy reservationStrategy = reservationStrategies.get(req.getType());
+            if(reservationStrategy == null){
+                ReservationResult result = new ReservationResult();
+                result.setReservationId(reservationId);
+                result.setResult(ReservationResultEnum.FAILED);
+                result.setErrorCode(ReservationErrorCodeEnum.INVALID_ARGUMENT);
+                result.setErrorMessage(String.format("%s reservation strategy is not implemented", req.getType()));
+                return KeyValue.pair(reservationId, result);
+            }
+
             ReservationResult result = reservationStrategy.reserve(areaStatus, req);
 
             if(result.getResult() == ReservationResultEnum.SUCCESS){
@@ -211,7 +221,6 @@ public class EventService {
                 areaStatusStore.put(eventAreaId, areaStatusAndTimestamp);
             }
 
-            String reservationId = req.getReservationId().toString();
             return KeyValue.pair(reservationId, result);
         }
 
