@@ -1,0 +1,9 @@
+{
+  "type": "record",
+  "name": "Seat",
+  "namespace": "lab.tall15421542.app.avro.reservation",
+  "fields": [
+    {"name": "row", "type": "int"},
+    {"name": "col", "type": "int"}
+  ]
+}
