@@ -6,6 +6,7 @@ import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.kstream.Produced;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.kstream.KStream;
+import org.apache.kafka.streams.kstream.KTable;
 import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.KafkaStreams.State;
 import org.apache.kafka.streams.StreamsConfig;
@@ -213,6 +214,8 @@ public class EventService {
                     SeatStatus seatStatus = areaStatus.getSeats().get(seat.getRow()).get(seat.getCol());
                     seatStatus.setIsAvailable(false);
                 }
+                int availableSeats = areaStatus.getAvailableSeats() - result.getSeats().size();
+                areaStatus.setAvailableSeats(availableSeats);
                 areaStatusStore.put(eventAreaId, ValueAndTimestamp.make(areaStatus, Instant.now().toEpochMilli()));
             }
 
@@ -245,7 +248,7 @@ public class EventService {
                 }
         );
 
-        createEventAreas.toTable(
+        KTable<String, AreaStatus> areaStatus = createEventAreas.toTable(
                 Materialized.<String, AreaStatus, KeyValueStore<Bytes, byte[]>>as(Schemas.Stores.AREA_STATUS.name())
                         .withKeySerde(Schemas.Stores.AREA_STATUS.keySerde())
                         .withValueSerde(Schemas.Stores.AREA_STATUS.valueSerde())
@@ -264,6 +267,12 @@ public class EventService {
         reserveResult.to(Topics.RESERVATION_RESULT.name(), Produced.with(
                 Topics.RESERVATION_RESULT.keySerde(),
                 Topics.RESERVATION_RESULT.valueSerde()
+        ));
+
+        // emit event area status state changes
+        areaStatus.toStream().to(Topics.EVENT_AREA_STATUS_UPDATE.name(), Produced.with(
+                Topics.EVENT_AREA_STATUS_UPDATE.keySerde(),
+                Topics.EVENT_AREA_STATUS_UPDATE.valueSerde()
         ));
 
         final Topology topology = builder.build();
