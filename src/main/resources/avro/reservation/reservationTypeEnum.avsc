@@ -1,0 +1,6 @@
+{
+  "type": "enum",
+  "name": "ReservationTypeEnum",
+  "namespace": "lab.tall15421542.app.avro.reservation",
+  "symbols": ["SELF_PICK", "RANDOM", "INVALID"]
+}
