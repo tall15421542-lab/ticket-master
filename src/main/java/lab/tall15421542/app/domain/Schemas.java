@@ -4,6 +4,7 @@ import lab.tall15421542.app.avro.event.CreateEvent;
 import lab.tall15421542.app.avro.event.AreaStatus;
 import lab.tall15421542.app.avro.reservation.ReserveSeat;
 import lab.tall15421542.app.avro.reservation.ReservationResult;
+import lab.tall15421542.app.avro.reservation.Reservation;
 
 import io.confluent.kafka.streams.serdes.avro.SpecificAvroSerde;
 
@@ -51,6 +52,8 @@ public class Schemas{
         public static Topic<String, CreateEvent> CREATE_EVENT;
         public static Topic<String, ReserveSeat> RESERVE_SEAT;
         public static Topic<String, ReservationResult> RESERVATION_RESULT;
+        public static Topic<String, AreaStatus> EVENT_AREA_STATUS_UPDATE;
+        public static Topic<String, ReserveSeat> RESERVATION_RESERVE_SEAT;
 
         static {
             createTopics();
@@ -65,6 +68,12 @@ public class Schemas{
 
             RESERVATION_RESULT = new Topic<>("reservationResult", Serdes.String(), new SpecificAvroSerde<>());
             ALL.put("reservationResult", RESERVATION_RESULT);
+
+            EVENT_AREA_STATUS_UPDATE = new Topic<>("eventAreaStatusUpdate", Serdes.String(), new SpecificAvroSerde<>());
+            ALL.put("eventAreaStatusUpdate", EVENT_AREA_STATUS_UPDATE);
+
+            RESERVATION_RESERVE_SEAT = new Topic<>("reservation.reserveSeat", Serdes.String(), new SpecificAvroSerde<>());
+            ALL.put("reservation.reserveSeat", RESERVATION_RESERVE_SEAT);
         }
     }
 
@@ -99,6 +108,8 @@ public class Schemas{
     public static class Stores {
         public final static Map<String, Store<?, ?>> ALL = new HashMap<>();
         public static Store<String, AreaStatus> AREA_STATUS;
+        public static Store<String, Reservation> RESERVATION;
+        public static Store<String, AreaStatus> EVENT_AREA_STATUS_CACHE;
 
         static {
             createStores();
@@ -107,6 +118,12 @@ public class Schemas{
         private static void createStores(){
             AREA_STATUS = new Store<>("AreaStatus", Serdes.String(), new SpecificAvroSerde<>());
             ALL.put("AreaStatus", AREA_STATUS);
+
+            RESERVATION = new Store<>("Reservation", Serdes.String(), new SpecificAvroSerde<>());
+            ALL.put("Reservation", RESERVATION);
+
+            EVENT_AREA_STATUS_CACHE = new Store<>("eventAreaStatusCache", Serdes.String(), new SpecificAvroSerde<>());
+            ALL.put("eventAreaStatusCache", EVENT_AREA_STATUS_CACHE);
         }
     }
 

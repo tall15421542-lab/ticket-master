@@ -28,6 +28,11 @@
         "name": "StateEnum",
         "symbols": ["PROCESSING", "RESERVED", "FAILED", "PAID", "CANCELLED"]
       }
+    },
+    {
+      "name": "failedReason",
+      "type": "string",
+      "default": ""
     }
   ]
 }
