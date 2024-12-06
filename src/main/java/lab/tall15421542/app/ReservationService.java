@@ -63,6 +63,17 @@ public class ReservationService {
         }
     }
 
+    private static class RandomContinuousFilterStrategy implements FilterStrategy {
+        @Override
+        public boolean pass(AreaStatus areaStatus, ReserveSeat req){
+            int colCount = areaStatus.getColCount();
+            if(req.getNumOfSeats() > areaStatus.getAvailableSeats() || req.getNumOfSeats() > colCount){
+                return false;
+            }
+            return true;
+        }
+    }
+
     private static class ReservationTransformer implements ValueTransformer<ReserveSeat, Reservation>{
         private KeyValueStore<String, ValueAndTimestamp<AreaStatus>> eventAreaStatusCache;
         private Map<ReservationTypeEnum, FilterStrategy> filterStrategies;
@@ -72,6 +83,7 @@ public class ReservationService {
             eventAreaStatusCache = context.getStateStore(Schemas.Stores.EVENT_AREA_STATUS_CACHE.name());
             filterStrategies = new HashMap<>();
             filterStrategies.put(ReservationTypeEnum.SELF_PICK, new SelfPickFilterStrategy());
+            filterStrategies.put(ReservationTypeEnum.RANDOM, new RandomContinuousFilterStrategy());
         }
 
         @Override
@@ -80,8 +92,8 @@ public class ReservationService {
                     req.getReservationId(),
                     req.getEventId(),
                     req.getAreaId(),
-                    0,
                     req.getNumOfSeats(),
+                    req.getNumOfSeat(),
                     req.getType(),
                     req.getSeats(),
                     StateEnum.PROCESSING,
