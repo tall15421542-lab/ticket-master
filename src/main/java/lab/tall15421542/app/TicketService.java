@@ -82,8 +82,9 @@ public class TicketService {
     public void createReservation(final ReservationBean reservationBean,
                                   @Suspended final AsyncResponse asyncResponse){
         ReserveSeat req = reservationBean.toAvro();
-        String eventAreaId = req.getEventId().toString() + "#" + req.getAreaId().toString();
-        reserveSeatProducer.send(new ProducerRecord<String, ReserveSeat>(Schemas.Topics.RESERVE_SEAT.name(), eventAreaId, req));
+        reserveSeatProducer.send(new ProducerRecord<String, ReserveSeat>(
+                Schemas.Topics.RESERVATION_RESERVE_SEAT.name(), req.getReservationId().toString(), req));
+
         asyncResponse.resume(reservationBean);
     }
 
