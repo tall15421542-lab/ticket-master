@@ -49,8 +49,12 @@ public class ReservationService {
     private static class SelfPickFilterStrategy implements FilterStrategy{
         @Override
         public boolean pass(AreaStatus areaStatus, ReserveSeat req){
+            int rowCount = areaStatus.getRowCount(), colCount = areaStatus.getColCount();
             for(Seat seat: req.getSeats()){
                 int r = seat.getRow(), c = seat.getCol();
+                if(r < 0 || r >= rowCount || c < 0 || c >= colCount){
+                    return false;
+                }
                 if(areaStatus.getSeats().get(r).get(c).getIsAvailable() == false){
                     return false;
                 }
