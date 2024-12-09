@@ -8,12 +8,14 @@ import lab.tall15421542.app.avro.reservation.ReservationTypeEnum;
 import lab.tall15421542.app.avro.reservation.StateEnum;
 import lab.tall15421542.app.avro.reservation.Seat;
 import lab.tall15421542.app.avro.event.AreaStatus;
+import org.apache.kafka.common.utils.Bytes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.kafka.streams.state.Stores;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.kstream.KStream;
+import org.apache.kafka.streams.kstream.KTable;
 import org.apache.kafka.streams.kstream.Materialized;
 import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.kstream.Produced;
@@ -155,11 +157,20 @@ public class ReservationService {
                 )
         );
 
-        KStream<String, Reservation> preprocessed = reservationRequests.transformValues(
+        KStream<String, Reservation> createReservationStream = reservationRequests.transformValues(
                 ()-> new ReservationTransformer());
 
+        KTable<String, Reservation> reservationTable = createReservationStream.toTable(
+                Materialized.<String, Reservation, KeyValueStore<Bytes, byte[]>>as(Schemas.Stores.RESERVATION.name())
+                        .withKeySerde(Schemas.Stores.RESERVATION.keySerde())
+                        .withValueSerde(Schemas.Stores.RESERVATION.valueSerde())
+                        .withCachingDisabled()
+        );
+
+        KStream<String, Reservation> reservationStream = reservationTable.toStream();
+
         final String PROCESSING = "processing", FAILED = "failed", PREFIX = "reservation";
-        Map<String, KStream<String, Reservation>> result = preprocessed.split(Named.as(PREFIX))
+        Map<String, KStream<String, Reservation>> result = reservationStream.split(Named.as(PREFIX))
                 .branch(
                         (reservationId, reservation) -> reservation.getState() == StateEnum.FAILED,
                         Branched.as(FAILED)
@@ -187,6 +198,8 @@ public class ReservationService {
         );
 
         processingReqs.to(Topics.RESERVE_SEAT.name(), Produced.with(Topics.RESERVE_SEAT.keySerde(), Topics.RESERVE_SEAT.valueSerde()));
+
+        // TODO: consume reservationResult, trigger reservation state change in state store
 
         final Topology topology = builder.build();
         System.out.println(topology.describe());
