@@ -2,40 +2,39 @@ package lab.tall15421542.app;
 
 import lab.tall15421542.app.domain.Schemas;
 import lab.tall15421542.app.domain.Schemas.Topics;
-import lab.tall15421542.app.avro.reservation.ReserveSeat;
-import lab.tall15421542.app.avro.reservation.Reservation;
-import lab.tall15421542.app.avro.reservation.ReservationTypeEnum;
-import lab.tall15421542.app.avro.reservation.StateEnum;
-import lab.tall15421542.app.avro.reservation.Seat;
 import lab.tall15421542.app.avro.event.AreaStatus;
+import lab.tall15421542.app.avro.reservation.ReservationResult;
+import lab.tall15421542.app.avro.reservation.Reservation;
+import lab.tall15421542.app.avro.reservation.ReserveSeat;
+import lab.tall15421542.app.avro.reservation.ReservationTypeEnum;
+import lab.tall15421542.app.avro.reservation.Seat;
+import lab.tall15421542.app.avro.reservation.ReservationResultEnum;
+import lab.tall15421542.app.avro.reservation.StateEnum;
 import org.apache.kafka.common.utils.Bytes;
+import org.apache.kafka.streams.kstream.*;
+import org.apache.kafka.streams.processor.api.FixedKeyProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.kafka.streams.state.Stores;
 import org.apache.kafka.streams.StreamsBuilder;
-import org.apache.kafka.streams.kstream.KStream;
-import org.apache.kafka.streams.kstream.KTable;
-import org.apache.kafka.streams.kstream.Materialized;
-import org.apache.kafka.streams.kstream.Consumed;
-import org.apache.kafka.streams.kstream.Produced;
 import org.apache.kafka.streams.Topology;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.streams.KafkaStreams;
-import org.apache.kafka.streams.kstream.ValueTransformer;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.state.ValueAndTimestamp;
-import org.apache.kafka.streams.kstream.Branched;
 import org.apache.kafka.streams.KeyValue;
-import org.apache.kafka.streams.kstream.Named;
+import org.apache.kafka.streams.processor.api.FixedKeyRecord;
+import org.apache.kafka.streams.processor.api.FixedKeyProcessorContext;
 
 import static io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.PipedReader;
+import java.time.Instant;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Properties;
@@ -44,6 +43,47 @@ public class ReservationService {
     private static final Logger log = LoggerFactory.getLogger(ReservationService.class);
     private static final int MaxLRUEntries = 1000;
 
+    private static class ReservationResultProcessor implements FixedKeyProcessor<String, ReservationResult, Void>{
+        private KeyValueStore<String, ValueAndTimestamp<Reservation>> reservationStore;
+
+        @Override
+        public void init(FixedKeyProcessorContext context){
+            reservationStore = context.getStateStore(Schemas.Stores.RESERVATION.name());
+        }
+
+        @Override
+        public void process(FixedKeyRecord<String, ReservationResult> record){
+            String reservationId = record.key();
+            ReservationResult reservationResult = record.value();
+
+            ValueAndTimestamp<Reservation> reservationAndTimestamp = reservationStore.get(reservationId);
+            Reservation reservation = ValueAndTimestamp.getValueOrNull(reservationAndTimestamp);
+            if(reservation == null){
+                System.out.println("reservation id: " + reservationId + " does not exist.");
+                return;
+            }
+
+            if (reservationResult.getResult() == ReservationResultEnum.SUCCESS) {
+                reservation.setState(StateEnum.RESERVED);
+                reservation.setSeats(reservationResult.getSeats());
+            } else if (reservationResult.getResult() == ReservationResultEnum.FAILED) {
+                reservation.setState(StateEnum.FAILED);
+                reservation.setFailedReason(
+                        String.format("[%s]: %s", reservationResult.getErrorCode(), reservationResult.getErrorMessage())
+                );
+            } else {
+                reservation.setState(StateEnum.FAILED);
+                reservation.setFailedReason(String.format("Invalid result: %s", reservationResult.getResult()));
+            }
+
+            reservationStore.put(reservationId, ValueAndTimestamp.make(reservation, Instant.now().toEpochMilli()));
+        }
+
+        @Override
+        public void close(){
+
+        }
+    }
     private static interface FilterStrategy {
         boolean pass(AreaStatus areaStatus, ReserveSeat req);
     }
@@ -167,10 +207,10 @@ public class ReservationService {
                         .withCachingDisabled()
         );
 
-        KStream<String, Reservation> reservationStream = reservationTable.toStream();
+        KStream<String, Reservation> reservationStatusUpdatedStream = reservationTable.toStream();
 
         final String PROCESSING = "processing", FAILED = "failed", PREFIX = "reservation";
-        Map<String, KStream<String, Reservation>> result = reservationStream.split(Named.as(PREFIX))
+        Map<String, KStream<String, Reservation>> result = reservationStatusUpdatedStream.split(Named.as(PREFIX))
                 .branch(
                         (reservationId, reservation) -> reservation.getState() == StateEnum.FAILED,
                         Branched.as(FAILED)
@@ -200,6 +240,15 @@ public class ReservationService {
         processingReqs.to(Topics.RESERVE_SEAT.name(), Produced.with(Topics.RESERVE_SEAT.keySerde(), Topics.RESERVE_SEAT.valueSerde()));
 
         // TODO: consume reservationResult, trigger reservation state change in state store
+        KStream<String, ReservationResult> reservationResults = builder.stream(
+                Topics.RESERVATION_RESULT.name(),
+                Consumed.with(
+                        Topics.RESERVATION_RESULT.keySerde(),
+                        Topics.RESERVATION_RESULT.valueSerde()
+                )
+        );
+
+        reservationResults.processValues(()-> new ReservationResultProcessor(), Schemas.Stores.RESERVATION.name());
 
         final Topology topology = builder.build();
         System.out.println(topology.describe());

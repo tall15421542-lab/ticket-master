@@ -54,6 +54,7 @@ public class Schemas{
         public static Topic<String, ReservationResult> RESERVATION_RESULT;
         public static Topic<String, AreaStatus> EVENT_AREA_STATUS_UPDATE;
         public static Topic<String, ReserveSeat> RESERVATION_RESERVE_SEAT;
+        public static Topic<String, Reservation> RESERVATION;
 
         static {
             createTopics();
@@ -74,6 +75,9 @@ public class Schemas{
 
             RESERVATION_RESERVE_SEAT = new Topic<>("reservation.reserveSeat", Serdes.String(), new SpecificAvroSerde<>());
             ALL.put("reservation.reserveSeat", RESERVATION_RESERVE_SEAT);
+
+            RESERVATION = new Topic<>("reservation", Serdes.String(), new SpecificAvroSerde<>());
+            ALL.put("reservation", RESERVATION);
         }
     }
 
