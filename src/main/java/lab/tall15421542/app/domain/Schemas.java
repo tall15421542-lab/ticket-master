@@ -49,35 +49,41 @@ public class Schemas{
 
     public static class Topics {
         public final static Map<String, Topic<?, ?>> ALL = new HashMap<>();
-        public static Topic<String, CreateEvent> CREATE_EVENT;
-        public static Topic<String, ReserveSeat> RESERVE_SEAT;
-        public static Topic<String, ReservationResult> RESERVATION_RESULT;
-        public static Topic<String, AreaStatus> EVENT_AREA_STATUS_UPDATE;
-        public static Topic<String, ReserveSeat> RESERVATION_RESERVE_SEAT;
-        public static Topic<String, Reservation> RESERVATION;
+        public static Topic<String, CreateEvent> COMMAND_EVENT_CREATE_EVENT;
+        public static Topic<String, ReserveSeat> COMMAND_EVENT_RESERVE_SEAT;
+        public static Topic<String, ReservationResult> RESPONSE_RESERVATION_RESULT;
+        public static Topic<String, AreaStatus> STATE_EVENT_AREA_STATUS;
+        public static Topic<String, ReserveSeat> COMMAND_RESERVATION_CREATE_RESERVATION;
+        public static Topic<String, Reservation> STATE_USER_RESERVATION;
 
         static {
             createTopics();
         }
 
         private static void createTopics(){
-            CREATE_EVENT = new Topic<>("createEvent", Serdes.String(), new SpecificAvroSerde<>());
-            ALL.put("createEvent", CREATE_EVENT);
+            // key: event name
+            COMMAND_EVENT_CREATE_EVENT = new Topic<>("command.event.create_event", Serdes.String(), new SpecificAvroSerde<>());
+            ALL.put("command.event.create_event", COMMAND_EVENT_CREATE_EVENT);
 
-            RESERVE_SEAT = new Topic<>("reserveSeat", Serdes.String(), new SpecificAvroSerde<>());
-            ALL.put("reserveSeat", RESERVE_SEAT);
+            // key: eventId + "#" + areaId
+            COMMAND_EVENT_RESERVE_SEAT = new Topic<>("command.event.reserve_seat", Serdes.String(), new SpecificAvroSerde<>());
+            ALL.put("command.event.reserve_seat", COMMAND_EVENT_RESERVE_SEAT);
 
-            RESERVATION_RESULT = new Topic<>("reservationResult", Serdes.String(), new SpecificAvroSerde<>());
-            ALL.put("reservationResult", RESERVATION_RESULT);
+            // key: reservation id
+            RESPONSE_RESERVATION_RESULT = new Topic<>("response.reservation.result", Serdes.String(), new SpecificAvroSerde<>());
+            ALL.put("response.reservation.result", RESPONSE_RESERVATION_RESULT);
 
-            EVENT_AREA_STATUS_UPDATE = new Topic<>("eventAreaStatusUpdate", Serdes.String(), new SpecificAvroSerde<>());
-            ALL.put("eventAreaStatusUpdate", EVENT_AREA_STATUS_UPDATE);
+            // key: eventId + "#" + areaId
+            STATE_EVENT_AREA_STATUS = new Topic<>("state.event.area_status", Serdes.String(), new SpecificAvroSerde<>());
+            ALL.put("state.event.area_status", STATE_EVENT_AREA_STATUS);
 
-            RESERVATION_RESERVE_SEAT = new Topic<>("reservation.reserveSeat", Serdes.String(), new SpecificAvroSerde<>());
-            ALL.put("reservation.reserveSeat", RESERVATION_RESERVE_SEAT);
+            // key: user id
+            COMMAND_RESERVATION_CREATE_RESERVATION = new Topic<>("command.reservation.create_reservation", Serdes.String(), new SpecificAvroSerde<>());
+            ALL.put("command.reservation.create_reservation", COMMAND_RESERVATION_CREATE_RESERVATION);
 
-            RESERVATION = new Topic<>("reservation", Serdes.String(), new SpecificAvroSerde<>());
-            ALL.put("reservation", RESERVATION);
+            // key user id
+            STATE_USER_RESERVATION = new Topic<>("state.user.reservation", Serdes.String(), new SpecificAvroSerde<>());
+            ALL.put("state.user.reservation", STATE_USER_RESERVATION);
         }
     }
 
@@ -120,12 +126,15 @@ public class Schemas{
         }
 
         private static void createStores(){
+            // Key: eventId + "#" + areaId
             AREA_STATUS = new Store<>("AreaStatus", Serdes.String(), new SpecificAvroSerde<>());
             ALL.put("AreaStatus", AREA_STATUS);
 
+            // Key: reservation id
             RESERVATION = new Store<>("Reservation", Serdes.String(), new SpecificAvroSerde<>());
             ALL.put("Reservation", RESERVATION);
 
+            // key: eventId + "#" areaId
             EVENT_AREA_STATUS_CACHE = new Store<>("eventAreaStatusCache", Serdes.String(), new SpecificAvroSerde<>());
             ALL.put("eventAreaStatusCache", EVENT_AREA_STATUS_CACHE);
         }

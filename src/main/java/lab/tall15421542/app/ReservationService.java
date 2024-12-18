@@ -33,7 +33,6 @@ import static io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig.SCHE
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
-import java.io.PipedReader;
 import java.time.Instant;
 import java.util.Map;
 import java.util.HashMap;
@@ -181,7 +180,7 @@ public class ReservationService {
         final StreamsBuilder builder = new StreamsBuilder();
 
         builder.globalTable(
-                Topics.EVENT_AREA_STATUS_UPDATE.name(),
+                Topics.STATE_EVENT_AREA_STATUS.name(),
                 Materialized.<String, AreaStatus>as(
                             Stores.lruMap(Schemas.Stores.EVENT_AREA_STATUS_CACHE.name(), MaxLRUEntries)
                         )
@@ -190,10 +189,10 @@ public class ReservationService {
         );
 
         KStream<String, ReserveSeat> reservationRequests = builder.stream(
-                Topics.RESERVATION_RESERVE_SEAT.name(),
+                Topics.COMMAND_RESERVATION_CREATE_RESERVATION.name(),
                 Consumed.with(
-                    Topics.RESERVATION_RESERVE_SEAT.keySerde(),
-                    Topics.RESERVATION_RESERVE_SEAT.valueSerde()
+                    Topics.COMMAND_RESERVATION_CREATE_RESERVATION.keySerde(),
+                    Topics.COMMAND_RESERVATION_CREATE_RESERVATION.valueSerde()
                 )
         );
 
@@ -237,14 +236,14 @@ public class ReservationService {
                 )
         );
 
-        processingReqs.to(Topics.RESERVE_SEAT.name(), Produced.with(Topics.RESERVE_SEAT.keySerde(), Topics.RESERVE_SEAT.valueSerde()));
+        processingReqs.to(Topics.COMMAND_EVENT_RESERVE_SEAT.name(), Produced.with(Topics.COMMAND_EVENT_RESERVE_SEAT.keySerde(), Topics.COMMAND_EVENT_RESERVE_SEAT.valueSerde()));
 
         // TODO: consume reservationResult, trigger reservation state change in state store
         KStream<String, ReservationResult> reservationResults = builder.stream(
-                Topics.RESERVATION_RESULT.name(),
+                Topics.RESPONSE_RESERVATION_RESULT.name(),
                 Consumed.with(
-                        Topics.RESERVATION_RESULT.keySerde(),
-                        Topics.RESERVATION_RESULT.valueSerde()
+                        Topics.RESPONSE_RESERVATION_RESULT.keySerde(),
+                        Topics.RESPONSE_RESERVATION_RESULT.valueSerde()
                 )
         );
 
