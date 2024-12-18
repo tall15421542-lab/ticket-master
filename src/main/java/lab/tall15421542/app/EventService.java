@@ -8,19 +8,15 @@ import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.kstream.KStream;
 import org.apache.kafka.streams.kstream.KTable;
 import org.apache.kafka.streams.KeyValue;
-import org.apache.kafka.streams.KafkaStreams.State;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.Topology;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.state.KeyValueStore;
-import org.apache.kafka.streams.state.KeyValueIterator;
 import org.apache.kafka.streams.kstream.Materialized;
 import org.apache.kafka.streams.kstream.Transformer;
 import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.kstream.TransformerSupplier;
 import org.apache.kafka.streams.errors.DeserializationExceptionHandler;
-import org.apache.kafka.streams.errors.DeserializationExceptionHandler.DeserializationHandlerResponse;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.streams.state.ValueAndTimestamp;
 
@@ -235,8 +231,8 @@ public class EventService {
         final StreamsBuilder builder = new StreamsBuilder();
 
         // Create Event Flow
-        KStream<String, CreateEvent> createEventReqs = builder.stream(Topics.CREATE_EVENT.name(),
-                        Consumed.with(Topics.CREATE_EVENT.keySerde(), Topics.CREATE_EVENT.valueSerde()));
+        KStream<String, CreateEvent> createEventReqs = builder.stream(Topics.COMMAND_EVENT_CREATE_EVENT.name(),
+                        Consumed.with(Topics.COMMAND_EVENT_CREATE_EVENT.keySerde(), Topics.COMMAND_EVENT_CREATE_EVENT.valueSerde()));
 
         KStream<String, AreaStatus> createEventAreas = createEventReqs.flatMap(
                 (eventName, createEvent) -> {
@@ -255,8 +251,8 @@ public class EventService {
         );
 
         // Reservation Flow
-        KStream<String, ReserveSeat> reserveSeatReqs = builder.stream(Topics.RESERVE_SEAT.name(),
-                Consumed.with(Topics.RESERVE_SEAT.keySerde(), Topics.RESERVE_SEAT.valueSerde()));
+        KStream<String, ReserveSeat> reserveSeatReqs = builder.stream(Topics.COMMAND_EVENT_RESERVE_SEAT.name(),
+                Consumed.with(Topics.COMMAND_EVENT_RESERVE_SEAT.keySerde(), Topics.COMMAND_EVENT_RESERVE_SEAT.valueSerde()));
 
         KStream<String, ReservationResult> reserveResult = reserveSeatReqs.transform(new TransformerSupplier() {
             public Transformer get() {
@@ -264,15 +260,15 @@ public class EventService {
             }
         }, Schemas.Stores.AREA_STATUS.name());
 
-        reserveResult.to(Topics.RESERVATION_RESULT.name(), Produced.with(
-                Topics.RESERVATION_RESULT.keySerde(),
-                Topics.RESERVATION_RESULT.valueSerde()
+        reserveResult.to(Topics.RESPONSE_RESERVATION_RESULT.name(), Produced.with(
+                Topics.RESPONSE_RESERVATION_RESULT.keySerde(),
+                Topics.RESPONSE_RESERVATION_RESULT.valueSerde()
         ));
 
         // emit event area status state changes
-        areaStatus.toStream().to(Topics.EVENT_AREA_STATUS_UPDATE.name(), Produced.with(
-                Topics.EVENT_AREA_STATUS_UPDATE.keySerde(),
-                Topics.EVENT_AREA_STATUS_UPDATE.valueSerde()
+        areaStatus.toStream().to(Topics.STATE_EVENT_AREA_STATUS.name(), Produced.with(
+                Topics.STATE_EVENT_AREA_STATUS.keySerde(),
+                Topics.STATE_EVENT_AREA_STATUS.valueSerde()
         ));
 
         final Topology topology = builder.build();

@@ -48,8 +48,8 @@ public class TicketService {
     }
 
     public void start(String bootstrapServers, Properties config){
-        createEventProducer = startProducer(bootstrapServers, Schemas.Topics.CREATE_EVENT, config);
-        reserveSeatProducer = startProducer(bootstrapServers, Schemas.Topics.RESERVE_SEAT, config);
+        createEventProducer = startProducer(bootstrapServers, Schemas.Topics.COMMAND_EVENT_CREATE_EVENT, config);
+        reserveSeatProducer = startProducer(bootstrapServers, Schemas.Topics.COMMAND_RESERVATION_CREATE_RESERVATION, config);
         startJetty(4403, this);
     }
 
@@ -70,7 +70,7 @@ public class TicketService {
     public void createEvent(final EventBean eventBean,
                          @Suspended final AsyncResponse asyncResponse) {
         CreateEvent req = eventBean.toAvro();
-        createEventProducer.send(new ProducerRecord<String, CreateEvent>(Schemas.Topics.CREATE_EVENT.name(), req.getEventName().toString(), req));
+        createEventProducer.send(new ProducerRecord<String, CreateEvent>(Schemas.Topics.COMMAND_EVENT_CREATE_EVENT.name(), req.getEventName().toString(), req));
         asyncResponse.resume(eventBean);
     }
 
@@ -83,7 +83,7 @@ public class TicketService {
                                   @Suspended final AsyncResponse asyncResponse){
         ReserveSeat req = reservationBean.toAvro();
         reserveSeatProducer.send(new ProducerRecord<String, ReserveSeat>(
-                Schemas.Topics.RESERVATION_RESERVE_SEAT.name(), req.getReservationId().toString(), req));
+                Schemas.Topics.COMMAND_RESERVATION_CREATE_RESERVATION.name(), req.getReservationId().toString(), req));
 
         asyncResponse.resume(reservationBean);
     }
