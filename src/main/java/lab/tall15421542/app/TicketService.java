@@ -4,7 +4,7 @@ import lab.tall15421542.app.domain.beans.EventBean;
 import lab.tall15421542.app.domain.beans.ReservationBean;
 import lab.tall15421542.app.domain.Schemas;
 import lab.tall15421542.app.avro.event.CreateEvent;
-import lab.tall15421542.app.avro.reservation.ReserveSeat;
+import lab.tall15421542.app.avro.reservation.CreateReservation;
 
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletContextHandler;
@@ -36,7 +36,7 @@ import java.util.Properties;
 @Path("v1")
 public class TicketService {
     private KafkaProducer<String, CreateEvent> createEventProducer;
-    private KafkaProducer<String, ReserveSeat> reserveSeatProducer;
+    private KafkaProducer<String, CreateReservation> CreateReservationProducer;
 
     public static void main(final String[] args) {
         Properties config = new Properties();
@@ -49,7 +49,7 @@ public class TicketService {
 
     public void start(String bootstrapServers, Properties config){
         createEventProducer = startProducer(bootstrapServers, Schemas.Topics.COMMAND_EVENT_CREATE_EVENT, config);
-        reserveSeatProducer = startProducer(bootstrapServers, Schemas.Topics.COMMAND_RESERVATION_CREATE_RESERVATION, config);
+        CreateReservationProducer = startProducer(bootstrapServers, Schemas.Topics.COMMAND_RESERVATION_CREATE_RESERVATION, config);
         startJetty(4403, this);
     }
 
@@ -81,8 +81,8 @@ public class TicketService {
     @Produces({MediaType.APPLICATION_JSON})
     public void createReservation(final ReservationBean reservationBean,
                                   @Suspended final AsyncResponse asyncResponse){
-        ReserveSeat req = reservationBean.toAvro();
-        reserveSeatProducer.send(new ProducerRecord<String, ReserveSeat>(
+        CreateReservation req = reservationBean.toAvro();
+        CreateReservationProducer.send(new ProducerRecord<String, CreateReservation>(
                 Schemas.Topics.COMMAND_RESERVATION_CREATE_RESERVATION.name(), req.getReservationId().toString(), req));
 
         asyncResponse.resume(reservationBean);

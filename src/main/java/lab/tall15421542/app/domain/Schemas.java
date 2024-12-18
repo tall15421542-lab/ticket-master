@@ -2,7 +2,8 @@ package lab.tall15421542.app.domain;
 
 import lab.tall15421542.app.avro.event.CreateEvent;
 import lab.tall15421542.app.avro.event.AreaStatus;
-import lab.tall15421542.app.avro.reservation.ReserveSeat;
+import lab.tall15421542.app.avro.event.ReserveSeat;
+import lab.tall15421542.app.avro.reservation.CreateReservation;
 import lab.tall15421542.app.avro.reservation.ReservationResult;
 import lab.tall15421542.app.avro.reservation.Reservation;
 
@@ -53,7 +54,7 @@ public class Schemas{
         public static Topic<String, ReserveSeat> COMMAND_EVENT_RESERVE_SEAT;
         public static Topic<String, ReservationResult> RESPONSE_RESERVATION_RESULT;
         public static Topic<String, AreaStatus> STATE_EVENT_AREA_STATUS;
-        public static Topic<String, ReserveSeat> COMMAND_RESERVATION_CREATE_RESERVATION;
+        public static Topic<String, CreateReservation> COMMAND_RESERVATION_CREATE_RESERVATION;
         public static Topic<String, Reservation> STATE_USER_RESERVATION;
 
         static {
