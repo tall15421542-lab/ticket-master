@@ -1,6 +1,6 @@
 package lab.tall15421542.app.domain.beans;
 
-import lab.tall15421542.app.avro.reservation.ReserveSeat;
+import lab.tall15421542.app.avro.reservation.CreateReservation;
 import lab.tall15421542.app.avro.reservation.Seat;
 import lab.tall15421542.app.avro.reservation.ReservationTypeEnum;
 
@@ -90,8 +90,8 @@ public class ReservationBean {
         }
     }
 
-    public ReserveSeat toAvro(){
-        ReserveSeat avroReserveSeat = new ReserveSeat();
+    public CreateReservation toAvro(){
+        CreateReservation avroReserveSeat = new CreateReservation();
         avroReserveSeat.setReservationId(this.reservationId);
         avroReserveSeat.setEventId(this.eventId);
         avroReserveSeat.setAreaId(this.areaId);

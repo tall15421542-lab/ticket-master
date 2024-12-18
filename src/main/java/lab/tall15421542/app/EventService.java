@@ -40,7 +40,7 @@ import lab.tall15421542.app.avro.event.CreateEvent;
 import lab.tall15421542.app.avro.event.Area;
 import lab.tall15421542.app.avro.event.AreaStatus;
 import lab.tall15421542.app.avro.event.SeatStatus;
-import lab.tall15421542.app.avro.reservation.ReserveSeat;
+import lab.tall15421542.app.avro.event.ReserveSeat;
 import lab.tall15421542.app.avro.reservation.Seat;
 import lab.tall15421542.app.avro.reservation.ReservationResult;
 import lab.tall15421542.app.avro.reservation.ReservationResultEnum;

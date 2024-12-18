@@ -3,9 +3,10 @@ package lab.tall15421542.app;
 import lab.tall15421542.app.domain.Schemas;
 import lab.tall15421542.app.domain.Schemas.Topics;
 import lab.tall15421542.app.avro.event.AreaStatus;
+import lab.tall15421542.app.avro.event.ReserveSeat;
 import lab.tall15421542.app.avro.reservation.ReservationResult;
 import lab.tall15421542.app.avro.reservation.Reservation;
-import lab.tall15421542.app.avro.reservation.ReserveSeat;
+import lab.tall15421542.app.avro.reservation.CreateReservation;
 import lab.tall15421542.app.avro.reservation.ReservationTypeEnum;
 import lab.tall15421542.app.avro.reservation.Seat;
 import lab.tall15421542.app.avro.reservation.ReservationResultEnum;
@@ -84,12 +85,12 @@ public class ReservationService {
         }
     }
     private static interface FilterStrategy {
-        boolean pass(AreaStatus areaStatus, ReserveSeat req);
+        boolean pass(AreaStatus areaStatus, CreateReservation req);
     }
 
     private static class SelfPickFilterStrategy implements FilterStrategy{
         @Override
-        public boolean pass(AreaStatus areaStatus, ReserveSeat req){
+        public boolean pass(AreaStatus areaStatus, CreateReservation req){
             int rowCount = areaStatus.getRowCount(), colCount = areaStatus.getColCount();
             for(Seat seat: req.getSeats()){
                 int r = seat.getRow(), c = seat.getCol();
@@ -106,7 +107,7 @@ public class ReservationService {
 
     private static class RandomContinuousFilterStrategy implements FilterStrategy {
         @Override
-        public boolean pass(AreaStatus areaStatus, ReserveSeat req){
+        public boolean pass(AreaStatus areaStatus, CreateReservation req){
             int colCount = areaStatus.getColCount();
             if(req.getNumOfSeats() > areaStatus.getAvailableSeats() || req.getNumOfSeats() > colCount){
                 return false;
@@ -115,7 +116,7 @@ public class ReservationService {
         }
     }
 
-    private static class ReservationTransformer implements ValueTransformer<ReserveSeat, Reservation>{
+    private static class ReservationTransformer implements ValueTransformer<CreateReservation, Reservation>{
         private KeyValueStore<String, ValueAndTimestamp<AreaStatus>> eventAreaStatusCache;
         private Map<ReservationTypeEnum, FilterStrategy> filterStrategies;
 
@@ -128,7 +129,7 @@ public class ReservationService {
         }
 
         @Override
-        public Reservation transform(ReserveSeat req){
+        public Reservation transform(CreateReservation req){
             Reservation reservation = new Reservation(
                     req.getReservationId(),
                     req.getEventId(),
@@ -188,7 +189,7 @@ public class ReservationService {
                         .withValueSerde(Schemas.Stores.EVENT_AREA_STATUS_CACHE.valueSerde())
         );
 
-        KStream<String, ReserveSeat> reservationRequests = builder.stream(
+        KStream<String, CreateReservation> reservationRequests = builder.stream(
                 Topics.COMMAND_RESERVATION_CREATE_RESERVATION.name(),
                 Consumed.with(
                     Topics.COMMAND_RESERVATION_CREATE_RESERVATION.keySerde(),
