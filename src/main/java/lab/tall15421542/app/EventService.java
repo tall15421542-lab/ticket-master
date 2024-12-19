@@ -82,9 +82,9 @@ public class EventService {
             String reservationId = req.getReservationId().toString();
             result.setReservationId(reservationId);
 
+            int areaRowCount = areaStatus.getRowCount(), areaColCount = areaStatus.getColCount();
             for(Seat seat: req.getSeats()){
                 int row = seat.getRow(), col = seat.getCol();
-                int areaRowCount = areaStatus.getRowCount(), areaColCount = areaStatus.getColCount();
                 if(row < 0 || row >= areaRowCount || col < 0 || col >= areaColCount){
                     result.setResult(ReservationResultEnum.FAILED);
                     result.setErrorCode(ReservationErrorCodeEnum.INVALID_SEAT);
@@ -170,6 +170,7 @@ public class EventService {
     private static class ReserveSeatTransformer implements Transformer<String, ReserveSeat, KeyValue<String, ReservationResult>>{
         private KeyValueStore<String, ValueAndTimestamp<AreaStatus>> areaStatusStore;
         private Map<ReservationTypeEnum, ReservationStrategy> reservationStrategies;
+
         @Override
         public void init(ProcessorContext context){
             areaStatusStore = context.getStateStore(Schemas.Stores.AREA_STATUS.name());
