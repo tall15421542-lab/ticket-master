@@ -2,20 +2,14 @@ package lab.tall15421542.app;
 
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.kafka.streams.KafkaStreams;
-import org.apache.kafka.streams.kstream.Consumed;
-import org.apache.kafka.streams.kstream.Produced;
+import org.apache.kafka.streams.kstream.*;
 import org.apache.kafka.streams.StreamsBuilder;
-import org.apache.kafka.streams.kstream.KStream;
-import org.apache.kafka.streams.kstream.KTable;
 import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.Topology;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.streams.state.KeyValueStore;
-import org.apache.kafka.streams.kstream.Materialized;
-import org.apache.kafka.streams.kstream.Transformer;
 import org.apache.kafka.streams.processor.ProcessorContext;
-import org.apache.kafka.streams.kstream.TransformerSupplier;
 import org.apache.kafka.streams.errors.DeserializationExceptionHandler;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.streams.state.ValueAndTimestamp;
@@ -33,6 +27,12 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Map;
 import java.util.HashMap;
+
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.DefaultParser;
+import org.apache.commons.cli.HelpFormatter;
+import org.apache.commons.cli.Option;
+import org.apache.commons.cli.Options;
 
 import lab.tall15421542.app.domain.Schemas;
 import lab.tall15421542.app.domain.Schemas.Topics;
@@ -224,6 +224,20 @@ public class EventService {
         }
     }
     public static void main(final String[] args) throws Exception {
+        final Options opts = new Options();
+        opts.addOption(Option.builder("d")
+                        .longOpt("state-dir").hasArg().desc("The directory for state storage").build())
+                .addOption(Option.builder("h").longOpt("help").hasArg(false).desc("Show usage information").build());
+
+        final CommandLine cl = new DefaultParser().parse(opts, args);
+        if (cl.hasOption("h")) {
+            final HelpFormatter formatter = new HelpFormatter();
+            formatter.printHelp("Event Service", opts);
+            return;
+        }
+
+        final String stateDir = cl.getOptionValue("state-dir", "/tmp/kafka-streams");
+
         Properties config = new Properties();
         config.put(SCHEMA_REGISTRY_URL_CONFIG, "http://localhost:8081");
         Schemas.configureSerdes(config);
@@ -244,7 +258,12 @@ public class EventService {
                 }
         );
 
-        KTable<String, AreaStatus> areaStatus = createEventAreas.toTable(
+        KStream<String, AreaStatus> repartitionedCreateEventAreas = createEventAreas.repartition(
+                Repartitioned.<String,AreaStatus>numberOfPartitions(10)
+                        .withKeySerde(Schemas.Stores.AREA_STATUS.keySerde())
+                        .withValueSerde(Schemas.Stores.AREA_STATUS.valueSerde()));
+
+        KTable<String, AreaStatus> areaStatus = repartitionedCreateEventAreas.toTable(
                 Materialized.<String, AreaStatus, KeyValueStore<Bytes, byte[]>>as(Schemas.Stores.AREA_STATUS.name())
                         .withKeySerde(Schemas.Stores.AREA_STATUS.keySerde())
                         .withValueSerde(Schemas.Stores.AREA_STATUS.valueSerde())
@@ -280,6 +299,7 @@ public class EventService {
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         props.put(StreamsConfig.DEFAULT_DESERIALIZATION_EXCEPTION_HANDLER_CLASS_CONFIG,
                 MyDeserializationExceptionHandler.class.getName());
+        props.put(StreamsConfig.STATE_DIR_CONFIG, stateDir);
 
         KafkaStreams streams = new KafkaStreams(topology, props);
         streams.start();
