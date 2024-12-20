@@ -1,11 +1,20 @@
 package lab.tall15421542.app;
 
+import lab.tall15421542.app.avro.reservation.*;
 import lab.tall15421542.app.domain.beans.EventBean;
 import lab.tall15421542.app.domain.beans.ReservationBean;
 import lab.tall15421542.app.domain.Schemas;
 import lab.tall15421542.app.avro.event.CreateEvent;
-import lab.tall15421542.app.avro.reservation.CreateReservation;
 
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.streams.*;
+import org.apache.kafka.streams.kstream.Consumed;
+import org.apache.kafka.streams.kstream.KStream;
+import org.apache.kafka.streams.kstream.Transformer;
+import org.apache.kafka.streams.kstream.ValueTransformer;
+import org.apache.kafka.streams.processor.ProcessorContext;
+import org.apache.kafka.streams.state.KeyValueStore;
+import org.apache.kafka.streams.state.ValueAndTimestamp;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
@@ -31,26 +40,75 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.ProducerConfig;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.Properties;
+import java.util.UUID;
 
 @Path("v1")
 public class TicketService {
     private KafkaProducer<String, CreateEvent> createEventProducer;
     private KafkaProducer<String, CreateReservation> CreateReservationProducer;
 
-    public static void main(final String[] args) {
+    public static void main(final String[] args) throws Exception {
         Properties config = new Properties();
         config.put(SCHEMA_REGISTRY_URL_CONFIG, "http://localhost:8081");
         Schemas.configureSerdes(config);
 
         final TicketService service = new TicketService();
         service.start("localhost:29092,localhost:39092,localhost:49092", config);
+
+        final StreamsBuilder builder = new StreamsBuilder();
+        KStream<String, Reservation> reservationStream = builder.stream(
+                Schemas.Topics.STATE_USER_RESERVATION.name(),
+                Consumed.with(
+                        Schemas.Topics.STATE_USER_RESERVATION.keySerde(),
+                        Schemas.Topics.STATE_USER_RESERVATION.valueSerde()
+                ));
+
+        reservationStream.transform(() -> new ReservationTransformer()).foreach(
+                (requestId, reservation) -> System.out.println(requestId + ": " + reservation)
+        );
+        final Topology topology = builder.build();
+        System.out.println(topology.describe());
+
+        Properties props = new Properties();
+        props.put(StreamsConfig.APPLICATION_ID_CONFIG, "ticket-service");
+        props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:29092");
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
+
+        KafkaStreams streams = new KafkaStreams(topology, props);
+        streams.start();
+
+        new BufferedReader(new InputStreamReader(System.in)).readLine();
+        streams.close();
     }
 
     public void start(String bootstrapServers, Properties config){
         createEventProducer = startProducer(bootstrapServers, Schemas.Topics.COMMAND_EVENT_CREATE_EVENT, config);
         CreateReservationProducer = startProducer(bootstrapServers, Schemas.Topics.COMMAND_RESERVATION_CREATE_RESERVATION, config);
         startJetty(4403, this);
+    }
+
+    private static class ReservationTransformer implements Transformer<String, Reservation, KeyValue<String, Reservation>> {
+        private ProcessorContext context;
+        @Override
+        public void init(ProcessorContext context){
+            this.context = context;
+        }
+
+        @Override
+        public KeyValue<String, Reservation> transform(String reservationId, Reservation reservation){
+           String requestId = new String(this.context.headers().lastHeader("request-id").value());
+           return KeyValue.pair(requestId, reservation);
+        }
+
+        @Override
+        public void close(){
+
+        }
     }
 
     @GET
@@ -82,8 +140,13 @@ public class TicketService {
     public void createReservation(final ReservationBean reservationBean,
                                   @Suspended final AsyncResponse asyncResponse){
         CreateReservation req = reservationBean.toAvro();
-        CreateReservationProducer.send(new ProducerRecord<String, CreateReservation>(
-                Schemas.Topics.COMMAND_RESERVATION_CREATE_RESERVATION.name(), req.getReservationId().toString(), req));
+        ProducerRecord<String, CreateReservation> record = new ProducerRecord<>(
+                Schemas.Topics.COMMAND_RESERVATION_CREATE_RESERVATION.name(), req.getUserId().toString(), req);
+
+        String requestId = UUID.randomUUID().toString();
+        System.out.println("request-id: " + requestId);
+        record.headers().add("request-id", requestId.getBytes(StandardCharsets.UTF_8));
+        CreateReservationProducer.send(record);
 
         asyncResponse.resume(reservationBean);
     }
