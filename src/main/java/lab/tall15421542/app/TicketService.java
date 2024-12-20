@@ -7,11 +7,9 @@ import lab.tall15421542.app.domain.Schemas;
 import lab.tall15421542.app.avro.event.CreateEvent;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.common.utils.Bytes;
 import org.apache.kafka.streams.*;
-import org.apache.kafka.streams.kstream.Consumed;
-import org.apache.kafka.streams.kstream.KStream;
-import org.apache.kafka.streams.kstream.Transformer;
-import org.apache.kafka.streams.kstream.ValueTransformer;
+import org.apache.kafka.streams.kstream.*;
 import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.ValueAndTimestamp;
@@ -68,9 +66,12 @@ public class TicketService {
                         Schemas.Topics.STATE_USER_RESERVATION.valueSerde()
                 ));
 
-        reservationStream.transform(() -> new ReservationTransformer()).foreach(
-                (requestId, reservation) -> System.out.println(requestId + ": " + reservation)
-        );
+        reservationStream.transform(() -> new ReservationTransformer()).toTable(
+                Materialized.<String, Reservation, KeyValueStore<Bytes, byte[]>>as(Schemas.Stores.REQUEST_ID_RESERVATION.name())
+                        .withKeySerde(Schemas.Stores.REQUEST_ID_RESERVATION.keySerde())
+                        .withValueSerde(Schemas.Stores.REQUEST_ID_RESERVATION.valueSerde())
+                        .withCachingDisabled());
+
         final Topology topology = builder.build();
         System.out.println(topology.describe());
 

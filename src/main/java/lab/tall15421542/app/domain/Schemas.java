@@ -121,6 +121,7 @@ public class Schemas{
         public static Store<String, AreaStatus> AREA_STATUS;
         public static Store<String, Reservation> RESERVATION;
         public static Store<String, AreaStatus> EVENT_AREA_STATUS_CACHE;
+        public static Store<String, Reservation> REQUEST_ID_RESERVATION;
 
         static {
             createStores();
@@ -138,6 +139,10 @@ public class Schemas{
             // key: eventId + "#" areaId
             EVENT_AREA_STATUS_CACHE = new Store<>("eventAreaStatusCache", Serdes.String(), new SpecificAvroSerde<>());
             ALL.put("eventAreaStatusCache", EVENT_AREA_STATUS_CACHE);
+
+            // Key: reservation id
+            REQUEST_ID_RESERVATION = new Store<>("Request_Id_Reservation", Serdes.String(), new SpecificAvroSerde<>());
+            ALL.put("Reservation", REQUEST_ID_RESERVATION);
         }
     }
 
