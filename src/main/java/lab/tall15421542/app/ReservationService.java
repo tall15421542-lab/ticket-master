@@ -242,20 +242,23 @@ public class ReservationService {
                 )
         );
 
-        KStream<String, Reservation> reservationStream = reservationResults.transformValues(()-> new ReservationResultTransformer(), Schemas.Stores.RESERVATION.name());
+        KStream<String, Reservation> updatedReservationStream = reservationResults.transformValues(()-> new ReservationResultTransformer(), Schemas.Stores.RESERVATION.name());
 
-        KStream<String, Reservation> reservationStatusUpdatedStream = reservationTable.toStream().merge(reservationStream);
+        KStream<String, Reservation> reservationStatusUpdatedStream = reservationTable.toStream().merge(updatedReservationStream);
 
-        final String PROCESSING = "processing", PROCESSED = "processed", PREFIX = "reservation-";
+        final String PROCESSING = "processing", PROCESSED = "processed", DEFAULT = "default", PREFIX = "reservation-";
         Map<String, KStream<String, Reservation>> result = reservationStatusUpdatedStream.split(Named.as(PREFIX))
                 .branch(
                         (reservationId, reservation) -> reservation.getState() == StateEnum.FAILED || reservation.getState() == StateEnum.RESERVED,
                         Branched.as(PROCESSED)
-                ).defaultBranch(Branched.as(PROCESSING));
+                ).branch(
+                        (reservationId, reservation) -> reservation.getState() == StateEnum.PROCESSING,
+                        Branched.as(PROCESSING)
+                ).defaultBranch(Branched.as(DEFAULT));
 
-        System.out.println(result.keySet());
         KStream<String, Reservation> processedReservation = result.get(PREFIX + PROCESSED);
         KStream<String, Reservation> processingReservation = result.get(PREFIX + PROCESSING);
+        KStream<String, Reservation> invalidReservation = result.get(PREFIX + DEFAULT);
 
         KStream<String, ReserveSeat> processingReqs = processingReservation.map(
                 (reservationId, reservation) -> KeyValue.pair(
@@ -277,6 +280,10 @@ public class ReservationService {
                 Topics.STATE_USER_RESERVATION.keySerde(),
                 Topics.STATE_USER_RESERVATION.valueSerde()
         ));
+
+        invalidReservation.foreach(
+                (reservationId, reservation) -> System.out.println("reservation " + reservationId + "has invalid state " + reservation.getState())
+        );
 
         final Topology topology = builder.build();
         System.out.println(topology.describe());
