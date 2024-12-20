@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.ArrayList;
 
 public class ReservationBean {
-    private String reservationId;
+    private String userId;
     private String eventId;
     private String areaId;
     private int numOfSeats;
@@ -17,12 +17,12 @@ public class ReservationBean {
 
     // Getters and Setters
 
-    public String getReservationId() {
-        return reservationId;
+    public String getUserId() {
+        return userId;
     }
 
-    public void setReservationId(String reservationId) {
-        this.reservationId = reservationId;
+    public void setUserId(String userId) {
+        this.userId = userId;
     }
 
     public String getEventId() {
@@ -91,11 +91,11 @@ public class ReservationBean {
     }
 
     public CreateReservation toAvro(){
-        CreateReservation avroReserveSeat = new CreateReservation();
-        avroReserveSeat.setReservationId(this.reservationId);
-        avroReserveSeat.setEventId(this.eventId);
-        avroReserveSeat.setAreaId(this.areaId);
-        avroReserveSeat.setNumOfSeats(this.numOfSeats);
+        CreateReservation avroCreateReservation = new CreateReservation();
+        avroCreateReservation.setUserId(this.userId);
+        avroCreateReservation.setEventId(this.eventId);
+        avroCreateReservation.setAreaId(this.areaId);
+        avroCreateReservation.setNumOfSeats(this.numOfSeats);
 
         // Convert the list of Seat objects to an Avro array
         List<Seat> avroSeats = new ArrayList<>();
@@ -107,15 +107,15 @@ public class ReservationBean {
                 avroSeats.add(avroSeat);
             }
         }
-        avroReserveSeat.put("seats", avroSeats);
+        avroCreateReservation.put("seats", avroSeats);
 
         try{
-            avroReserveSeat.put("type", ReservationTypeEnum.valueOf(this.type));
+            avroCreateReservation.put("type", ReservationTypeEnum.valueOf(this.type));
         }catch(IllegalArgumentException | NullPointerException e){
-            avroReserveSeat.put("type", ReservationTypeEnum.INVALID);
+            avroCreateReservation.put("type", ReservationTypeEnum.INVALID);
         }
 
-        return avroReserveSeat;
+        return avroCreateReservation;
     }
 }
 
