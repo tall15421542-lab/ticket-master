@@ -38,6 +38,7 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Properties;
+import java.util.UUID;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.DefaultParser;
@@ -122,7 +123,7 @@ public class ReservationService {
         }
     }
 
-    private static class ReservationTransformer implements ValueTransformer<CreateReservation, Reservation>{
+    private static class ReservationTransformer implements Transformer<String, CreateReservation, KeyValue<String, Reservation>>{
         private KeyValueStore<String, ValueAndTimestamp<AreaStatus>> eventAreaStatusCache;
         private Map<ReservationTypeEnum, FilterStrategy> filterStrategies;
 
@@ -135,9 +136,11 @@ public class ReservationService {
         }
 
         @Override
-        public Reservation transform(CreateReservation req){
+        public KeyValue<String,Reservation> transform(String userId, CreateReservation req){
+            String reservationId = UUID.randomUUID().toString();
             Reservation reservation = new Reservation(
-                    req.getReservationId(),
+                    reservationId,
+                    userId,
                     req.getEventId(),
                     req.getAreaId(),
                     req.getNumOfSeats(),
@@ -154,23 +157,23 @@ public class ReservationService {
 
             // eventAreaId is not in the cache, forward to event service;
             if(areaStatus == null){
-                return reservation;
+                return KeyValue.pair(reservationId, reservation);
             }
 
             FilterStrategy filter = filterStrategies.get(req.getType());
             if(filter == null){
                 reservation.setState(StateEnum.FAILED);
                 reservation.setFailedReason(String.format("%s type reservation is not supported", req.getType().toString()));
-                return reservation;
+                return KeyValue.pair(reservationId, reservation);
             }
 
             if(filter.pass(areaStatus, req)){
-                return reservation;
+                return KeyValue.pair(reservationId, reservation);
             }
 
             reservation.setState(StateEnum.FAILED);
             reservation.setFailedReason(String.format("request rejected at cache level"));
-            return reservation;
+            return KeyValue.pair(reservationId, reservation);
         }
 
         @Override
@@ -217,10 +220,11 @@ public class ReservationService {
                 )
         );
 
-        KStream<String, Reservation> createReservationStream = reservationRequests.transformValues(
+        // key: userId -> reservationId
+        KStream<String, Reservation> createReservationStream = reservationRequests.transform(
                 ()-> new ReservationTransformer());
 
-        // ensure reservation store has the same parition counts as the reservationResults topic
+        // ensure reservation store has the same parition counts as the reservation partitions.
         KStream<String, Reservation> repartitionedCreateReservationStream = createReservationStream.repartition(
                 Repartitioned.<String,Reservation>numberOfPartitions(20)
                         .withKeySerde(Schemas.Stores.RESERVATION.keySerde())
