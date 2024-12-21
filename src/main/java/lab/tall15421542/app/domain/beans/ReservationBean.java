@@ -49,7 +49,7 @@ public class ReservationBean {
         this.userId = userId;
         this.eventId = eventId;
         this.areaId = areaId;
-        this.numOfSeats = numOfSeat;
+        this.numOfSeats = numOfSeats;
         this.numOfSeat = numOfSeat;
         this.type = type;
         this.seats = seats;
