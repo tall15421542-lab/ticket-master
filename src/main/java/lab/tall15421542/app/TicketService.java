@@ -1,5 +1,6 @@
 package lab.tall15421542.app;
 
+import jakarta.ws.rs.core.Response;
 import lab.tall15421542.app.avro.reservation.*;
 import lab.tall15421542.app.domain.beans.EventBean;
 import lab.tall15421542.app.domain.beans.ReservationBean;
@@ -7,12 +8,14 @@ import lab.tall15421542.app.domain.Schemas;
 import lab.tall15421542.app.avro.event.CreateEvent;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.producer.Callback;
+import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.kafka.streams.*;
 import org.apache.kafka.streams.kstream.*;
 import org.apache.kafka.streams.processor.ProcessorContext;
+import org.apache.kafka.streams.state.HostInfo;
 import org.apache.kafka.streams.state.KeyValueStore;
-import org.apache.kafka.streams.state.ValueAndTimestamp;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
@@ -31,6 +34,7 @@ import jakarta.ws.rs.POST;
 import jakarta.ws.rs.container.AsyncResponse;
 import jakarta.ws.rs.container.Suspended;
 import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.NotFoundException;
 
 import static io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG;
 
@@ -40,8 +44,8 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
-import java.time.Instant;
 import java.util.Properties;
 import java.util.UUID;
 
@@ -57,6 +61,7 @@ public class TicketService {
     private KafkaProducer<String, CreateReservation> CreateReservationProducer;
     private String hostname;
     private int port;
+    private KafkaStreams streams;
 
     public TicketService(String hostname, int port){
         this.hostname = hostname;
@@ -95,8 +100,27 @@ public class TicketService {
         Schemas.configureSerdes(config);
 
         final TicketService service = new TicketService(restHostname, restPort);
+
+        config.put(StreamsConfig.STATE_DIR_CONFIG, stateDir);
         service.start(bootstrapServers, config);
 
+        new BufferedReader(new InputStreamReader(System.in)).readLine();
+        service.close();
+    }
+
+    public void start(String bootstrapServers, Properties config){
+        createEventProducer = startProducer(bootstrapServers, Schemas.Topics.COMMAND_EVENT_CREATE_EVENT, config);
+        CreateReservationProducer = startProducer(bootstrapServers, Schemas.Topics.COMMAND_RESERVATION_CREATE_RESERVATION, config);
+        this.streams = startKafkaStream(bootstrapServers, config);
+
+        startJetty(this.port, this);
+    }
+
+    public void close(){
+        this.streams.close();
+    }
+
+    private KafkaStreams startKafkaStream(String bootstrapServers, Properties config){
         final StreamsBuilder builder = new StreamsBuilder();
         KStream<String, Reservation> reservationStream = builder.stream(
                 Schemas.Topics.STATE_USER_RESERVATION.name(),
@@ -115,22 +139,15 @@ public class TicketService {
         System.out.println(topology.describe());
 
         Properties props = new Properties();
+        props.putAll(config);
         props.put(StreamsConfig.APPLICATION_ID_CONFIG, "ticket-service");
         props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
-        props.put(StreamsConfig.STATE_DIR_CONFIG, stateDir);
+        props.put(StreamsConfig.APPLICATION_SERVER_CONFIG, this.hostname + ":" + this.port);
 
         KafkaStreams streams = new KafkaStreams(topology, props);
         streams.start();
-
-        new BufferedReader(new InputStreamReader(System.in)).readLine();
-        streams.close();
-    }
-
-    public void start(String bootstrapServers, Properties config){
-        createEventProducer = startProducer(bootstrapServers, Schemas.Topics.COMMAND_EVENT_CREATE_EVENT, config);
-        CreateReservationProducer = startProducer(bootstrapServers, Schemas.Topics.COMMAND_RESERVATION_CREATE_RESERVATION, config);
-        startJetty(this.port, this);
+        return streams;
     }
 
     private static class ReservationTransformer implements Transformer<String, Reservation, KeyValue<String, Reservation>> {
@@ -187,9 +204,67 @@ public class TicketService {
         String requestId = UUID.randomUUID().toString();
         System.out.println("request-id: " + requestId);
         record.headers().add("request-id", requestId.getBytes(StandardCharsets.UTF_8));
-        CreateReservationProducer.send(record);
+        CreateReservationProducer.send(record, createReservationCallback(asyncResponse, requestId));
+    }
 
-        asyncResponse.resume(reservationBean);
+    private Callback createReservationCallback(final AsyncResponse asyncResponse, final String requestId){
+        return (recordMetadata, e) -> {
+            if (e != null) {
+                asyncResponse.resume(e);
+            } else {
+                try {
+                    // get key metadata
+                    // if it's in local, fetch from local
+                    // if it's in another host fetch from GET /reservation/request_id/{} internal endpoint;
+                    HostInfo hostForKey = getKeyLocationOrBlock(requestId, asyncResponse);
+                    if (hostForKey == null) { //request timed out so return
+                        asyncResponse.resume(Response.status(Response.Status.GATEWAY_TIMEOUT)
+                                .entity("HTTP GET timed out after \n")
+                                .build());
+                        return;
+                    }
+
+                    if(hostForKey.host().equals(this.hostname) && hostForKey.port() == this.port){
+                        asyncResponse.resume(hostForKey.toString());
+                    }else{
+                        asyncResponse.resume(Response.status(Response.Status.BAD_REQUEST).build());
+                    }
+                } catch (Exception exception) {
+                    exception.printStackTrace();
+                }
+            }
+        };
+    }
+
+    private HostInfo getKeyLocationOrBlock(final String id, final AsyncResponse asyncResponse) {
+        HostInfo locationOfKey = null;
+        while (locationOfKey == null) {
+            try {
+                KeyQueryMetadata metadata = this.streams.queryMetadataForKey(
+                        Schemas.Stores.REQUEST_ID_RESERVATION.name(),
+                        id, Schemas.Stores.REQUEST_ID_RESERVATION.keySerde().serializer()
+                );
+
+                if(metadata != KeyQueryMetadata.NOT_AVAILABLE){
+                    locationOfKey = metadata.activeHost();
+                }
+            } catch (final NotFoundException swallow) {
+                // swallow
+            }
+
+            //The metastore is not available. This can happen on startup/rebalance.
+            if (asyncResponse.isDone()) {
+                //The response timed out so return
+                return null;
+            }
+            try {
+                //Sleep a bit until metadata becomes available
+                Thread.sleep(Math.min(Long.parseLong("10000"), 200));
+            } catch (final InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+        return locationOfKey;
     }
 
     public static Server startJetty(final int port, final Object binding) {
