@@ -45,18 +45,57 @@ import java.time.Instant;
 import java.util.Properties;
 import java.util.UUID;
 
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.DefaultParser;
+import org.apache.commons.cli.HelpFormatter;
+import org.apache.commons.cli.Option;
+import org.apache.commons.cli.Options;
+
 @Path("v1")
 public class TicketService {
     private KafkaProducer<String, CreateEvent> createEventProducer;
     private KafkaProducer<String, CreateReservation> CreateReservationProducer;
+    private String hostname;
+    private int port;
+
+    public TicketService(String hostname, int port){
+        this.hostname = hostname;
+        this.port = port;
+    }
 
     public static void main(final String[] args) throws Exception {
+        final Options opts = new Options();
+        opts.addOption(Option.builder("b")
+                        .longOpt("bootstrap-servers").hasArg().desc("Kafka cluster bootstrap server string").build())
+                .addOption(Option.builder("s")
+                        .longOpt("schema-registry").hasArg().desc("Schema Registry URL").build())
+                .addOption(Option.builder("h")
+                        .longOpt("hostname").hasArg().desc("This services HTTP host name").build())
+                .addOption(Option.builder("p")
+                        .longOpt("port").hasArg().desc("This services HTTP port").build())
+                .addOption(Option.builder("d")
+                        .longOpt("state-dir").hasArg().desc("The directory for state storage").build())
+                .addOption(Option.builder("h").longOpt("help").hasArg(false).desc("Show usage information").build());
+
+        final CommandLine cl = new DefaultParser().parse(opts, args);
+        if (cl.hasOption("h")) {
+            final HelpFormatter formatter = new HelpFormatter();
+            formatter.printHelp("Ticket Service", opts);
+            return;
+        }
+
+        final String bootstrapServers = cl.getOptionValue("bootstrap-servers", "localhost:29092,localhost:39092,localhost:49092");
+        final String restHostname = cl.getOptionValue("hostname", "localhost");
+        final int restPort = Integer.parseInt(cl.getOptionValue("port", "4403"));
+        final String stateDir = cl.getOptionValue("state-dir", "/tmp/kafka-streams");
+        final String schemaRegistryUrl = cl.getOptionValue("schema-registry", "http://localhost:8081");
+
         Properties config = new Properties();
-        config.put(SCHEMA_REGISTRY_URL_CONFIG, "http://localhost:8081");
+        config.put(SCHEMA_REGISTRY_URL_CONFIG, schemaRegistryUrl);
         Schemas.configureSerdes(config);
 
-        final TicketService service = new TicketService();
-        service.start("localhost:29092,localhost:39092,localhost:49092", config);
+        final TicketService service = new TicketService(restHostname, restPort);
+        service.start(bootstrapServers, config);
 
         final StreamsBuilder builder = new StreamsBuilder();
         KStream<String, Reservation> reservationStream = builder.stream(
@@ -77,8 +116,9 @@ public class TicketService {
 
         Properties props = new Properties();
         props.put(StreamsConfig.APPLICATION_ID_CONFIG, "ticket-service");
-        props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:29092");
+        props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
+        props.put(StreamsConfig.STATE_DIR_CONFIG, stateDir);
 
         KafkaStreams streams = new KafkaStreams(topology, props);
         streams.start();
@@ -90,7 +130,7 @@ public class TicketService {
     public void start(String bootstrapServers, Properties config){
         createEventProducer = startProducer(bootstrapServers, Schemas.Topics.COMMAND_EVENT_CREATE_EVENT, config);
         CreateReservationProducer = startProducer(bootstrapServers, Schemas.Topics.COMMAND_RESERVATION_CREATE_RESERVATION, config);
-        startJetty(4403, this);
+        startJetty(this.port, this);
     }
 
     private static class ReservationTransformer implements Transformer<String, Reservation, KeyValue<String, Reservation>> {
