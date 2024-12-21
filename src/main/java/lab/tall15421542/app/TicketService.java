@@ -7,14 +7,18 @@ import lab.tall15421542.app.domain.beans.CreateReservationBean;
 import lab.tall15421542.app.domain.Schemas;
 import lab.tall15421542.app.avro.event.CreateEvent;
 
+import lab.tall15421542.app.domain.beans.ReservationBean;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.Callback;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.kafka.streams.*;
+import org.apache.kafka.streams.errors.InvalidStateStoreException;
 import org.apache.kafka.streams.kstream.*;
 import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.state.HostInfo;
 import org.apache.kafka.streams.state.KeyValueStore;
+import org.apache.kafka.streams.state.QueryableStoreTypes;
+import org.apache.kafka.streams.state.ReadOnlyKeyValueStore;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
@@ -44,8 +48,10 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.DefaultParser;
@@ -60,6 +66,7 @@ public class TicketService {
     private String hostname;
     private int port;
     private KafkaStreams streams;
+    private final Map<String, AsyncResponse> outstandingRequests = new ConcurrentHashMap<>();
 
     public TicketService(String hostname, int port){
         this.hostname = hostname;
@@ -127,11 +134,18 @@ public class TicketService {
                         Schemas.Topics.STATE_USER_RESERVATION.valueSerde()
                 ));
 
-        reservationStream.transform(() -> new ReservationTransformer()).toTable(
+        KTable<String, Reservation> reservationTable = reservationStream.transform(() -> new ReservationTransformer()).toTable(
                 Materialized.<String, Reservation, KeyValueStore<Bytes, byte[]>>as(Schemas.Stores.REQUEST_ID_RESERVATION.name())
                         .withKeySerde(Schemas.Stores.REQUEST_ID_RESERVATION.keySerde())
                         .withValueSerde(Schemas.Stores.REQUEST_ID_RESERVATION.valueSerde())
                         .withCachingDisabled());
+
+        reservationTable.toStream().foreach((requestId, reservation) -> {
+            final AsyncResponse asyncResponse = outstandingRequests.get(requestId);
+            if (asyncResponse != null) {
+                asyncResponse.resume(ReservationBean.fromAvro(reservation));
+            }
+        });
 
         final Topology topology = builder.build();
         System.out.println(topology.describe());
@@ -223,12 +237,18 @@ public class TicketService {
                     }
 
                     if(hostForKey.host().equals(this.hostname) && hostForKey.port() == this.port){
-                        asyncResponse.resume(hostForKey.toString());
+                        final Reservation reservation = reservationStore().get(requestId);
+                        if(reservation == null){
+                            outstandingRequests.put(requestId, asyncResponse);
+                        }else{
+                            asyncResponse.resume(ReservationBean.fromAvro(reservation));
+                        }
                     }else{
+                        // TODO: fetch from other host
                         asyncResponse.resume(Response.status(Response.Status.BAD_REQUEST).build());
                     }
-                } catch (Exception exception) {
-                    exception.printStackTrace();
+                } catch (final InvalidStateStoreException e2) {
+                    outstandingRequests.put(requestId, asyncResponse);
                 }
             }
         };
@@ -263,6 +283,13 @@ public class TicketService {
             }
         }
         return locationOfKey;
+    }
+
+    private ReadOnlyKeyValueStore<String, Reservation> reservationStore() {
+        return streams.store(
+                StoreQueryParameters.fromNameAndType(
+                        Schemas.Stores.REQUEST_ID_RESERVATION.name(),
+                        QueryableStoreTypes.keyValueStore()));
     }
 
     public static Server startJetty(final int port, final Object binding) {
