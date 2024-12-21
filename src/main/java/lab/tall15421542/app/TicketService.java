@@ -1,5 +1,6 @@
 package lab.tall15421542.app;
 
+import jakarta.ws.rs.core.GenericType;
 import jakarta.ws.rs.core.Response;
 import lab.tall15421542.app.avro.reservation.*;
 import lab.tall15421542.app.domain.beans.EventBean;
@@ -38,6 +39,8 @@ import jakarta.ws.rs.container.AsyncResponse;
 import jakarta.ws.rs.container.Suspended;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.NotFoundException;
+import jakarta.ws.rs.client.Client;
+import jakarta.ws.rs.client.ClientBuilder;
 
 import static io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG;
 
@@ -67,6 +70,7 @@ public class TicketService {
     private int port;
     private KafkaStreams streams;
     private final Map<String, AsyncResponse> outstandingRequests = new ConcurrentHashMap<>();
+    private final Client client = ClientBuilder.newBuilder().register(JacksonFeature.class).build();
 
     public TicketService(String hostname, int port){
         this.hostname = hostname;
@@ -190,6 +194,15 @@ public class TicketService {
         asyncResponse.resume(id);
     }
 
+    @GET
+    @ManagedAsync
+    @Path("/reservation/{request_id}")
+    @Produces({MediaType.APPLICATION_JSON})
+    public void getReservationByRequestId(@PathParam("request_id") final String requestId,
+                         @Suspended final AsyncResponse asyncResponse) {
+        fetchReservationFromLocal(requestId, asyncResponse);
+    }
+
     @POST
     @ManagedAsync
     @Path("/event")
@@ -237,21 +250,39 @@ public class TicketService {
                     }
 
                     if(hostForKey.host().equals(this.hostname) && hostForKey.port() == this.port){
-                        final Reservation reservation = reservationStore().get(requestId);
-                        if(reservation == null){
-                            outstandingRequests.put(requestId, asyncResponse);
-                        }else{
-                            asyncResponse.resume(ReservationBean.fromAvro(reservation));
-                        }
+                        fetchReservationFromLocal(requestId, asyncResponse);
                     }else{
                         // TODO: fetch from other host
-                        asyncResponse.resume(Response.status(Response.Status.BAD_REQUEST).build());
+                        final String path = "http://" + hostForKey.host() + ":" + hostForKey.port() + "/v1/reservation/" + requestId;
+                        fetchReservationFromOtherHost(path, asyncResponse);
                     }
                 } catch (final InvalidStateStoreException e2) {
                     outstandingRequests.put(requestId, asyncResponse);
                 }
             }
         };
+    }
+
+    private void fetchReservationFromLocal(String requestId, AsyncResponse asyncResponse){
+        final Reservation reservation = reservationStore().get(requestId);
+        if(reservation == null){
+            outstandingRequests.put(requestId, asyncResponse);
+        }else{
+            asyncResponse.resume(ReservationBean.fromAvro(reservation));
+        }
+    }
+
+    private void fetchReservationFromOtherHost(String path, AsyncResponse asyncResponse) {
+        System.out.println("Get from other host, path: " + path);
+        try {
+            final ReservationBean reservationBean = client.target(path)
+                    .request(MediaType.APPLICATION_JSON_TYPE)
+                    .get(new GenericType<ReservationBean>() {
+                    });
+            asyncResponse.resume(reservationBean);
+        } catch (final Exception swallowed) {
+            System.out.println("GET failed."+ swallowed);
+        }
     }
 
     private HostInfo getKeyLocationOrBlock(final String id, final AsyncResponse asyncResponse) {
