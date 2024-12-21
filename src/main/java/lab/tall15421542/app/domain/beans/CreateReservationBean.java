@@ -7,7 +7,7 @@ import lab.tall15421542.app.avro.reservation.ReservationTypeEnum;
 import java.util.List;
 import java.util.ArrayList;
 
-public class ReservationBean {
+public class CreateReservationBean {
     private String userId;
     private String eventId;
     private String areaId;

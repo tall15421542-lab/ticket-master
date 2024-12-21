@@ -3,13 +3,12 @@ package lab.tall15421542.app;
 import jakarta.ws.rs.core.Response;
 import lab.tall15421542.app.avro.reservation.*;
 import lab.tall15421542.app.domain.beans.EventBean;
-import lab.tall15421542.app.domain.beans.ReservationBean;
+import lab.tall15421542.app.domain.beans.CreateReservationBean;
 import lab.tall15421542.app.domain.Schemas;
 import lab.tall15421542.app.avro.event.CreateEvent;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.Callback;
-import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.kafka.streams.*;
 import org.apache.kafka.streams.kstream.*;
@@ -44,7 +43,6 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
-import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.util.Properties;
 import java.util.UUID;
@@ -195,9 +193,9 @@ public class TicketService {
     @Path("/event/{id}/reservation")
     @Consumes({MediaType.APPLICATION_JSON})
     @Produces({MediaType.APPLICATION_JSON})
-    public void createReservation(final ReservationBean reservationBean,
+    public void createReservation(final CreateReservationBean createReservationBean,
                                   @Suspended final AsyncResponse asyncResponse){
-        CreateReservation req = reservationBean.toAvro();
+        CreateReservation req = createReservationBean.toAvro();
         ProducerRecord<String, CreateReservation> record = new ProducerRecord<>(
                 Schemas.Topics.COMMAND_RESERVATION_CREATE_RESERVATION.name(), req.getUserId().toString(), req);
 
