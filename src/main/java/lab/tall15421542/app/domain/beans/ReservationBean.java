@@ -11,6 +11,7 @@ public class ReservationBean {
         private int row;
         private int col;
 
+        public SeatBean(){}
         public SeatBean(int row, int col){
             this.row = row;
             this.col = col;
@@ -41,6 +42,7 @@ public class ReservationBean {
     private String state;
     private String failedReason = "";
 
+    public ReservationBean(){}
     public ReservationBean(
             String reservationId, String userId, String eventId, String areaId,
             int numOfSeats, int numOfSeat, String type, List<SeatBean> seats,  String state,
