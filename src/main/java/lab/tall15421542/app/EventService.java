@@ -224,30 +224,13 @@ public class EventService {
             // do nothing
         }
     }
-    public static void main(final String[] args) throws Exception {
-        final Options opts = new Options();
-        opts.addOption(Option.builder("d")
-                        .longOpt("state-dir").hasArg().desc("The directory for state storage").build())
-                .addOption(Option.builder("h").longOpt("help").hasArg(false).desc("Show usage information").build());
 
-        final CommandLine cl = new DefaultParser().parse(opts, args);
-        if (cl.hasOption("h")) {
-            final HelpFormatter formatter = new HelpFormatter();
-            formatter.printHelp("Event Service", opts);
-            return;
-        }
-
-        final String stateDir = cl.getOptionValue("state-dir", "/tmp/kafka-streams");
-
-        Properties config = new Properties();
-        config.put(SCHEMA_REGISTRY_URL_CONFIG, "http://localhost:8081");
-        Schemas.configureSerdes(config);
-
+    public static Topology createTopology(){
         final StreamsBuilder builder = new StreamsBuilder();
 
         // Create Event Flow
         KStream<String, CreateEvent> createEventReqs = builder.stream(Topics.COMMAND_EVENT_CREATE_EVENT.name(),
-                        Consumed.with(Topics.COMMAND_EVENT_CREATE_EVENT.keySerde(), Topics.COMMAND_EVENT_CREATE_EVENT.valueSerde()));
+                Consumed.with(Topics.COMMAND_EVENT_CREATE_EVENT.keySerde(), Topics.COMMAND_EVENT_CREATE_EVENT.valueSerde()));
 
         KStream<String, AreaStatus> createEventAreas = createEventReqs.flatMap(
                 (eventName, createEvent) -> {
@@ -291,7 +274,29 @@ public class EventService {
                 Topics.STATE_EVENT_AREA_STATUS.valueSerde()
         ));
 
-        final Topology topology = builder.build();
+        return builder.build();
+    }
+    
+    public static void main(final String[] args) throws Exception {
+        final Options opts = new Options();
+        opts.addOption(Option.builder("d")
+                        .longOpt("state-dir").hasArg().desc("The directory for state storage").build())
+                .addOption(Option.builder("h").longOpt("help").hasArg(false).desc("Show usage information").build());
+
+        final CommandLine cl = new DefaultParser().parse(opts, args);
+        if (cl.hasOption("h")) {
+            final HelpFormatter formatter = new HelpFormatter();
+            formatter.printHelp("Event Service", opts);
+            return;
+        }
+
+        final String stateDir = cl.getOptionValue("state-dir", "/tmp/kafka-streams");
+
+        Properties config = new Properties();
+        config.put(SCHEMA_REGISTRY_URL_CONFIG, "http://localhost:8081");
+        Schemas.configureSerdes(config);
+
+        Topology topology = createTopology();
         System.out.println(topology.describe());
 
         Properties props = new Properties();
