@@ -142,7 +142,7 @@ public class Schemas{
 
             // Key: reservation id
             REQUEST_ID_RESERVATION = new Store<>("Request_Id_Reservation", Serdes.String(), new SpecificAvroSerde<>());
-            ALL.put("Reservation", REQUEST_ID_RESERVATION);
+            ALL.put("Request_Id_Reservation", REQUEST_ID_RESERVATION);
         }
     }
 
