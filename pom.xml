@@ -139,6 +139,13 @@
       <version>3.9.0</version>
     </dependency>
 
+    <dependency>
+      <groupId>org.apache.kafka</groupId>
+      <artifactId>kafka-streams-test-utils</artifactId>
+      <version>7.8.0-ccs</version>
+      <scope>test</scope>
+    </dependency>
+
     <!-- cli -->
     <dependency>
       <groupId>commons-cli</groupId>

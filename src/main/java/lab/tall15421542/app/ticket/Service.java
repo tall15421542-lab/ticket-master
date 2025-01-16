@@ -1,4 +1,4 @@
-package lab.tall15421542.app;
+package lab.tall15421542.app.ticket;
 
 import jakarta.ws.rs.core.GenericType;
 import jakarta.ws.rs.core.Response;
@@ -63,7 +63,7 @@ import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 
 @Path("v1")
-public class TicketService {
+public class Service {
     private KafkaProducer<String, CreateEvent> createEventProducer;
     private KafkaProducer<String, CreateReservation> CreateReservationProducer;
     private String hostname;
@@ -72,7 +72,7 @@ public class TicketService {
     private final Map<String, AsyncResponse> outstandingRequests = new ConcurrentHashMap<>();
     private final Client client = ClientBuilder.newBuilder().register(JacksonFeature.class).build();
 
-    public TicketService(String hostname, int port){
+    public Service(String hostname, int port){
         this.hostname = hostname;
         this.port = port;
     }
@@ -108,7 +108,7 @@ public class TicketService {
         config.put(SCHEMA_REGISTRY_URL_CONFIG, schemaRegistryUrl);
         Schemas.configureSerdes(config);
 
-        final TicketService service = new TicketService(restHostname, restPort);
+        final Service service = new Service(restHostname, restPort);
 
         config.put(StreamsConfig.STATE_DIR_CONFIG, stateDir);
         service.start(bootstrapServers, config);
