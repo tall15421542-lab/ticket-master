@@ -1,4 +1,4 @@
-package lab.tall15421542.app;
+package lab.tall15421542.app.reservation;
 
 import lab.tall15421542.app.domain.Schemas;
 import lab.tall15421542.app.domain.Schemas.Topics;
@@ -13,7 +13,6 @@ import lab.tall15421542.app.avro.reservation.ReservationResultEnum;
 import lab.tall15421542.app.avro.reservation.StateEnum;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.kafka.streams.kstream.*;
-import org.apache.kafka.streams.processor.api.FixedKeyProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,8 +26,6 @@ import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.state.ValueAndTimestamp;
 import org.apache.kafka.streams.KeyValue;
-import org.apache.kafka.streams.processor.api.FixedKeyRecord;
-import org.apache.kafka.streams.processor.api.FixedKeyProcessorContext;
 
 import static io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG;
 
@@ -46,8 +43,8 @@ import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 
-public class ReservationService {
-    private static final Logger log = LoggerFactory.getLogger(ReservationService.class);
+public class Service {
+    private static final Logger log = LoggerFactory.getLogger(Service.class);
     private static final int MaxLRUEntries = 1000;
 
     private static class ReservationResultTransformer implements ValueTransformer<ReservationResult, Reservation>{
@@ -224,7 +221,7 @@ public class ReservationService {
         KStream<String, Reservation> createReservationStream = reservationRequests.transform(
                 ()-> new ReservationTransformer());
 
-        // ensure reservation store has the same parition counts as the reservation partitions.
+        // ensure reservation store has the same partition counts as the reservation partitions.
         KStream<String, Reservation> repartitionedCreateReservationStream = createReservationStream.repartition(
                 Repartitioned.<String,Reservation>numberOfPartitions(20)
                         .withKeySerde(Schemas.Stores.RESERVATION.keySerde())

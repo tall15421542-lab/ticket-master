@@ -1,4 +1,4 @@
-package lab.tall15421542.app;
+package lab.tall15421542.app.event;
 
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.kafka.streams.KafkaStreams;
@@ -50,8 +50,8 @@ import lab.tall15421542.app.avro.reservation.ReservationTypeEnum;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class EventService {
-    private static final Logger log = LoggerFactory.getLogger(EventService.class);
+public class Service {
+    private static final Logger log = LoggerFactory.getLogger(Service.class);
 
     private static AreaStatus toAreaStatus(String eventName, Area area){
         String areaId = area.getAreaId().toString();

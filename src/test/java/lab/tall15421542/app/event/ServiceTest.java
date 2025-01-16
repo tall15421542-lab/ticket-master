@@ -1,10 +1,9 @@
-package lab.tall15421542.app;
+package lab.tall15421542.app.event;
 
 import lab.tall15421542.app.avro.event.Area;
 import lab.tall15421542.app.avro.event.AreaStatus;
 import lab.tall15421542.app.avro.event.CreateEvent;
 import lab.tall15421542.app.avro.event.SeatStatus;
-import lab.tall15421542.app.avro.reservation.Seat;
 import org.apache.kafka.streams.Topology;
 import org.apache.kafka.streams.state.KeyValueStore;
 
@@ -16,7 +15,6 @@ import static io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig.SCHE
 import static org.junit.jupiter.api.Assertions.*;
 
 import org.apache.kafka.streams.TestInputTopic;
-import org.apache.kafka.streams.TestOutputTopic;
 import org.apache.kafka.streams.TopologyTestDriver;
 
 import lab.tall15421542.app.domain.Schemas.Topics;
@@ -27,7 +25,7 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.Properties;
 
-class EventServiceTest {
+class ServiceTest {
     private TopologyTestDriver testDriver;
     private TestInputTopic<String, CreateEvent> MockCreateEventReqs;
     private KeyValueStore<String, AreaStatus> MockAreaStatusStore;
@@ -38,7 +36,7 @@ class EventServiceTest {
         config.put(SCHEMA_REGISTRY_URL_CONFIG, "mock://localhost:8081");
         Schemas.configureSerdes(config);
 
-        Topology topology = EventService.createTopology();
+        Topology topology = Service.createTopology();
         testDriver = new TopologyTestDriver(topology);
 
         // setup test topics
