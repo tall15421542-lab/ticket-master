@@ -100,7 +100,24 @@ class SelfPickStrategyTest {
         expectedResult.setResult(ReservationResultEnum.FAILED);
         expectedResult.setErrorCode(ReservationErrorCodeEnum.INVALID_SEAT);
         expectedResult.setErrorMessage("event#A (0, 2) is not a valid seat.");
+        assertEquals(expectedResult, strategy.reserve(areaStatus, req));
 
+        requestedSeats.clear();
+        requestedSeats.add(new Seat(0, -1));
+        req.setSeats(requestedSeats);
+        expectedResult.setErrorMessage("event#A (0, -1) is not a valid seat.");
+        assertEquals(expectedResult, strategy.reserve(areaStatus, req));
+
+        requestedSeats.clear();
+        requestedSeats.add(new Seat(-1, 0));
+        req.setSeats(requestedSeats);
+        expectedResult.setErrorMessage("event#A (-1, 0) is not a valid seat.");
+        assertEquals(expectedResult, strategy.reserve(areaStatus, req));
+
+        requestedSeats.clear();
+        requestedSeats.add(new Seat(2, 0));
+        req.setSeats(requestedSeats);
+        expectedResult.setErrorMessage("event#A (2, 0) is not a valid seat.");
         assertEquals(expectedResult, strategy.reserve(areaStatus, req));
     }
 }
