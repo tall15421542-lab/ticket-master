@@ -60,7 +60,7 @@ class ContinuousRandomStrategy implements Service.ReservationStrategy {
 
         result.setResult(ReservationResultEnum.FAILED);
         result.setErrorCode(ReservationErrorCodeEnum.NOT_AVAILABLE);
-        result.setErrorMessage(String.format("no continous %d seats at area %s in event %s",
+        result.setErrorMessage(String.format("no continuous %d seats at area %s in event %s",
                 req.getNumOfSeats(), req.getAreaId(), req.getEventId())
         );
         return result;
