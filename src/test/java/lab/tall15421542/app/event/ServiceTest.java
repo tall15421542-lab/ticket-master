@@ -1,10 +1,11 @@
 package lab.tall15421542.app.event;
 
-import lab.tall15421542.app.avro.event.Area;
-import lab.tall15421542.app.avro.event.AreaStatus;
-import lab.tall15421542.app.avro.event.CreateEvent;
-import lab.tall15421542.app.avro.event.SeatStatus;
-import org.apache.kafka.streams.Topology;
+import lab.tall15421542.app.avro.event.*;
+import lab.tall15421542.app.avro.reservation.ReservationResult;
+import lab.tall15421542.app.avro.reservation.ReservationResultEnum;
+import lab.tall15421542.app.avro.reservation.ReservationTypeEnum;
+import lab.tall15421542.app.avro.reservation.Seat;
+import org.apache.kafka.streams.*;
 import org.apache.kafka.streams.state.KeyValueStore;
 
 import org.junit.jupiter.api.AfterEach;
@@ -14,13 +15,11 @@ import org.junit.jupiter.api.Test;
 import static io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG;
 import static org.junit.jupiter.api.Assertions.*;
 
-import org.apache.kafka.streams.TestInputTopic;
-import org.apache.kafka.streams.TopologyTestDriver;
-
 import lab.tall15421542.app.domain.Schemas.Topics;
 import lab.tall15421542.app.domain.Schemas;
 
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Properties;
@@ -28,6 +27,8 @@ import java.util.Properties;
 class ServiceTest {
     private TopologyTestDriver testDriver;
     private TestInputTopic<String, CreateEvent> MockCreateEventReqs;
+    private TestInputTopic<String, ReserveSeat> MockReserveSeatReqs;
+    private TestOutputTopic<String, ReservationResult> MockReserveSeatResults;
     private KeyValueStore<String, AreaStatus> MockAreaStatusStore;
 
     @BeforeEach
@@ -44,6 +45,18 @@ class ServiceTest {
                 Topics.COMMAND_EVENT_CREATE_EVENT.name(),
                 Topics.COMMAND_EVENT_CREATE_EVENT.keySerde().serializer(),
                 Topics.COMMAND_EVENT_CREATE_EVENT.valueSerde().serializer());
+
+        MockReserveSeatReqs = testDriver.<String, ReserveSeat>createInputTopic(
+                Topics.COMMAND_EVENT_RESERVE_SEAT.name(),
+                Topics.COMMAND_EVENT_RESERVE_SEAT.keySerde().serializer(),
+                Topics.COMMAND_EVENT_RESERVE_SEAT.valueSerde().serializer()
+        );
+
+        MockReserveSeatResults = testDriver.createOutputTopic(
+                Topics.RESPONSE_RESERVATION_RESULT.name(),
+                Topics.RESPONSE_RESERVATION_RESULT.keySerde().deserializer(),
+                Topics.RESPONSE_RESERVATION_RESULT.valueSerde().deserializer()
+        );
 
         MockAreaStatusStore = testDriver.getKeyValueStore(Schemas.Stores.AREA_STATUS.name());
     }
@@ -78,6 +91,42 @@ class ServiceTest {
                 assertEquals(r, testSeatStatus.getRow());
                 assertEquals(c, testSeatStatus.getCol());
                 assertTrue(testSeatStatus.getIsAvailable());
+            }
+        }
+    }
+
+    @Test
+    void successfulReservation() {
+        List<Area> areas = new ArrayList<>();
+        areas.add(new Area("A", 1000, 3, 3));
+        areas.add(new Area("B", 1500, 5, 5));
+        CreateEvent req = new CreateEvent("Tony", "mockEvent", Instant.now(), Instant.now(), Instant.now(), Instant.now(), areas);
+
+        MockCreateEventReqs.pipeInput("mockEvent", req);
+        MockReserveSeatReqs.pipeInput("mockEvent#A", new ReserveSeat(
+                "reservationId", "mockEvent", "A", 3, 3, ReservationTypeEnum.RANDOM, new ArrayList<>()
+        ));
+
+        KeyValue<String, ReservationResult> result = MockReserveSeatResults.readKeyValue();
+        assertEquals("reservationId", result.key);
+
+        ReservationResult expectedResult = new ReservationResult(
+                "reservationId", ReservationResultEnum.SUCCESS,
+                Arrays.asList(new Seat(0,0), new Seat(0, 1), new Seat(0,2)), null, null
+        );
+        assertEquals(expectedResult, result.value);
+
+        AreaStatus currentAreaStatus = MockAreaStatusStore.get("mockEvent#A");
+        assertNotNull(currentAreaStatus);
+
+        assertEquals(6, currentAreaStatus.getAvailableSeats());
+        for(Seat seat: result.value.getSeats()){
+            assertFalse(currentAreaStatus.getSeats().get(seat.getRow()).get(seat.getCol()).getIsAvailable());
+        }
+
+        for(int row = 1 ; row < 3 ; ++row){
+            for(int col = 0 ; col < 3 ; ++col){
+                assertTrue(currentAreaStatus.getSeats().get(row).get(col).getIsAvailable());
             }
         }
     }
