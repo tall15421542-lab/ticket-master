@@ -1,10 +1,7 @@
 package lab.tall15421542.app.event;
 
 import lab.tall15421542.app.avro.event.*;
-import lab.tall15421542.app.avro.reservation.ReservationResult;
-import lab.tall15421542.app.avro.reservation.ReservationResultEnum;
-import lab.tall15421542.app.avro.reservation.ReservationTypeEnum;
-import lab.tall15421542.app.avro.reservation.Seat;
+import lab.tall15421542.app.avro.reservation.*;
 import org.apache.kafka.streams.*;
 import org.apache.kafka.streams.state.KeyValueStore;
 
@@ -125,6 +122,38 @@ class ServiceTest {
         }
 
         for(int row = 1 ; row < 3 ; ++row){
+            for(int col = 0 ; col < 3 ; ++col){
+                assertTrue(currentAreaStatus.getSeats().get(row).get(col).getIsAvailable());
+            }
+        }
+    }
+
+    @Test
+    void FailedReservation() {
+        List<Area> areas = new ArrayList<>();
+        areas.add(new Area("A", 1000, 3, 3));
+        areas.add(new Area("B", 1500, 5, 5));
+        CreateEvent req = new CreateEvent("Tony", "mockEvent", Instant.now(), Instant.now(), Instant.now(), Instant.now(), areas);
+
+        MockCreateEventReqs.pipeInput("mockEvent", req);
+        MockReserveSeatReqs.pipeInput("mockEvent#A", new ReserveSeat(
+                "reservationId", "mockEvent", "A", 4, 4, ReservationTypeEnum.RANDOM, new ArrayList<>()
+        ));
+
+        KeyValue<String, ReservationResult> result = MockReserveSeatResults.readKeyValue();
+        assertEquals("reservationId", result.key);
+
+        ReservationResult expectedResult = new ReservationResult(
+                "reservationId", ReservationResultEnum.FAILED,
+                null, ReservationErrorCodeEnum.NOT_AVAILABLE, "no continuous 4 seats at area A in event mockEvent"
+        );
+        assertEquals(expectedResult, result.value);
+
+        AreaStatus currentAreaStatus = MockAreaStatusStore.get("mockEvent#A");
+        assertNotNull(currentAreaStatus);
+
+        assertEquals(9, currentAreaStatus.getAvailableSeats());
+        for(int row = 0 ; row < 3 ; ++row){
             for(int col = 0 ; col < 3 ; ++col){
                 assertTrue(currentAreaStatus.getSeats().get(row).get(col).getIsAvailable());
             }
