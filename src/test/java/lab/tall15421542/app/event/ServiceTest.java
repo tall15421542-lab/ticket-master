@@ -16,16 +16,14 @@ import lab.tall15421542.app.domain.Schemas.Topics;
 import lab.tall15421542.app.domain.Schemas;
 
 import java.time.Instant;
-import java.util.Arrays;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Properties;
+import java.util.*;
 
 class ServiceTest {
     private TopologyTestDriver testDriver;
     private TestInputTopic<String, CreateEvent> MockCreateEventReqs;
     private TestInputTopic<String, ReserveSeat> MockReserveSeatReqs;
     private TestOutputTopic<String, ReservationResult> MockReserveSeatResults;
+    private TestOutputTopic<String, AreaStatus> MockAreaStatusChanged;
     private KeyValueStore<String, AreaStatus> MockAreaStatusStore;
 
     @BeforeEach
@@ -53,6 +51,12 @@ class ServiceTest {
                 Topics.RESPONSE_RESERVATION_RESULT.name(),
                 Topics.RESPONSE_RESERVATION_RESULT.keySerde().deserializer(),
                 Topics.RESPONSE_RESERVATION_RESULT.valueSerde().deserializer()
+        );
+
+        MockAreaStatusChanged = testDriver.createOutputTopic(
+                Topics.STATE_EVENT_AREA_STATUS.name(),
+                Topics.STATE_EVENT_AREA_STATUS.keySerde().deserializer(),
+                Topics.STATE_EVENT_AREA_STATUS.valueSerde().deserializer()
         );
 
         MockAreaStatusStore = testDriver.getKeyValueStore(Schemas.Stores.AREA_STATUS.name());
@@ -90,6 +94,10 @@ class ServiceTest {
                 assertTrue(testSeatStatus.getIsAvailable());
             }
         }
+
+        Map<String, AreaStatus> areaStatusChanged = MockAreaStatusChanged.readKeyValuesToMap();
+        assertEquals(MockAreaStatusStore.get("mockEvent#A"), areaStatusChanged.get("mockEvent#A"));
+        assertEquals(MockAreaStatusStore.get("mockEvent#B"), areaStatusChanged.get("mockEvent#B"));
     }
 
     @Test
@@ -100,6 +108,10 @@ class ServiceTest {
         CreateEvent req = new CreateEvent("Tony", "mockEvent", Instant.now(), Instant.now(), Instant.now(), Instant.now(), areas);
 
         MockCreateEventReqs.pipeInput("mockEvent", req);
+        Map<String, AreaStatus> areaStatusChanged = MockAreaStatusChanged.readKeyValuesToMap();
+        assertEquals(MockAreaStatusStore.get("mockEvent#A"), areaStatusChanged.get("mockEvent#A"));
+        assertEquals(MockAreaStatusStore.get("mockEvent#B"), areaStatusChanged.get("mockEvent#B"));
+
         MockReserveSeatReqs.pipeInput("mockEvent#A", new ReserveSeat(
                 "reservationId", "mockEvent", "A", 3, 3, ReservationTypeEnum.RANDOM, new ArrayList<>()
         ));
@@ -126,6 +138,10 @@ class ServiceTest {
                 assertTrue(currentAreaStatus.getSeats().get(row).get(col).getIsAvailable());
             }
         }
+
+        KeyValue<String, AreaStatus> reservationAreaStatusChanged = MockAreaStatusChanged.readKeyValue();
+        assertEquals("mockEvent#A", reservationAreaStatusChanged.key);
+        assertEquals(MockAreaStatusStore.get("mockEvent#A"), reservationAreaStatusChanged.value);
     }
 
     @Test
@@ -136,6 +152,10 @@ class ServiceTest {
         CreateEvent req = new CreateEvent("Tony", "mockEvent", Instant.now(), Instant.now(), Instant.now(), Instant.now(), areas);
 
         MockCreateEventReqs.pipeInput("mockEvent", req);
+        Map<String, AreaStatus> areaStatusChanged = MockAreaStatusChanged.readKeyValuesToMap();
+        assertEquals(MockAreaStatusStore.get("mockEvent#A"), areaStatusChanged.get("mockEvent#A"));
+        assertEquals(MockAreaStatusStore.get("mockEvent#B"), areaStatusChanged.get("mockEvent#B"));
+
         MockReserveSeatReqs.pipeInput("mockEvent#A", new ReserveSeat(
                 "reservationId", "mockEvent", "A", 4, 4, ReservationTypeEnum.RANDOM, new ArrayList<>()
         ));
@@ -158,5 +178,7 @@ class ServiceTest {
                 assertTrue(currentAreaStatus.getSeats().get(row).get(col).getIsAvailable());
             }
         }
+
+        assertTrue(MockAreaStatusChanged.isEmpty());
     }
 }
