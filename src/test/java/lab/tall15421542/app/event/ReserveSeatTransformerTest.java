@@ -182,6 +182,41 @@ class ReserveSeatTransformerTest {
         }
     }
 
+    @Test
+    void NonExistingEventAreaReservation(){
+        KeyValueStore<String, AreaStatus> areaStatusStore = testDriver.getKeyValueStore(Schemas.Stores.AREA_STATUS.name());
+        List<List<SeatStatus>> seats = new ArrayList<>();
+        for(int i = 0 ; i < 3 ; ++i){
+            seats.add(new ArrayList<SeatStatus>());
+            for(int j = 0 ; j < 3 ; ++j){
+                seats.get(i).add(new SeatStatus(i, j, true));
+            }
+        }
+        AreaStatus areaStatus = new AreaStatus("event", "A", 100, 3, 3, 9, seats);
+        areaStatusStore.put("event#A", areaStatus);
+
+        ReserveSeat req = new ReserveSeat("reservationId", "event", "B", 3, 3,
+                ReservationTypeEnum.SELF_PICK, Arrays.asList(new Seat(0,1), new Seat(0, 2), new Seat(0, 3)));
+        MockReserveSeatReqs.pipeInput("event#B", req);
+
+        KeyValue<String, ReservationResult> result = MockReservationResults.readKeyValue();
+        KeyValue<String, ReservationResult> expected = new KeyValue<>("reservationId", new ReservationResult(
+                "reservationId", ReservationResultEnum.FAILED,
+                null, ReservationErrorCodeEnum.INVALID_EVENT_AREA, "event#B event area does not exist"
+        ));
+        assertEquals(expected, result);
+
+        AreaStatus currentAreaStatus = areaStatusStore.get("event#A");
+        assertNotNull(currentAreaStatus);
+        assertEquals(9, currentAreaStatus.getAvailableSeats());
+
+        for(int row = 0 ; row < 3 ; ++row){
+            for(int col = 0 ; col < 3 ; ++col){
+                assertTrue(currentAreaStatus.getSeats().get(row).get(col).getIsAvailable());
+            }
+        }
+    }
+
     @AfterEach
     void tearDown() {
         testDriver.close();
