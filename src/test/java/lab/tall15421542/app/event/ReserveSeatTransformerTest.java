@@ -94,6 +94,57 @@ class ReserveSeatTransformerTest {
                 Arrays.asList(new Seat(0,0), new Seat(0, 1), new Seat(0,2)), null, null
         ));
         assertEquals(expected, result);
+
+        AreaStatus currentAreaStatus = areaStatusStore.get("event#A");
+        assertNotNull(currentAreaStatus);
+        assertEquals(6, currentAreaStatus.getAvailableSeats());
+        for(Seat seat: result.value.getSeats()){
+            assertFalse(currentAreaStatus.getSeats().get(seat.getRow()).get(seat.getCol()).getIsAvailable());
+        }
+
+        for(int row = 1 ; row < 3 ; ++row){
+            for(int col = 0 ; col < 3 ; ++col){
+                assertTrue(currentAreaStatus.getSeats().get(row).get(col).getIsAvailable());
+            }
+        }
+    }
+
+    @Test
+    void SuccessfulSelfPickReservation(){
+        KeyValueStore<String, AreaStatus> areaStatusStore = testDriver.getKeyValueStore(Schemas.Stores.AREA_STATUS.name());
+        List<List<SeatStatus>> seats = new ArrayList<>();
+        for(int i = 0 ; i < 3 ; ++i){
+            seats.add(new ArrayList<SeatStatus>());
+            for(int j = 0 ; j < 3 ; ++j){
+                seats.get(i).add(new SeatStatus(i, j, true));
+            }
+        }
+        AreaStatus areaStatus = new AreaStatus("event", "A", 100, 3, 3, 9, seats);
+        areaStatusStore.put("event#A", areaStatus);
+
+        ReserveSeat req = new ReserveSeat("reservationId", "event", "A", 3, 3,
+                ReservationTypeEnum.SELF_PICK, Arrays.asList(new Seat(0,0), new Seat(0, 1), new Seat(0, 2)));
+        MockReserveSeatReqs.pipeInput("event#A", req);
+
+        KeyValue<String, ReservationResult> result = MockReservationResults.readKeyValue();
+        KeyValue<String, ReservationResult> expected = new KeyValue<>("reservationId", new ReservationResult(
+                "reservationId", ReservationResultEnum.SUCCESS,
+                Arrays.asList(new Seat(0,0), new Seat(0, 1), new Seat(0,2)), null, null
+        ));
+        assertEquals(expected, result);
+
+        AreaStatus currentAreaStatus = areaStatusStore.get("event#A");
+        assertNotNull(currentAreaStatus);
+        assertEquals(6, currentAreaStatus.getAvailableSeats());
+        for(Seat seat: result.value.getSeats()){
+            assertFalse(currentAreaStatus.getSeats().get(seat.getRow()).get(seat.getCol()).getIsAvailable());
+        }
+
+        for(int row = 1 ; row < 3 ; ++row){
+            for(int col = 0 ; col < 3 ; ++col){
+                assertTrue(currentAreaStatus.getSeats().get(row).get(col).getIsAvailable());
+            }
+        }
     }
 
     @AfterEach
