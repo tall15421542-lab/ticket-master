@@ -120,7 +120,9 @@ public class Service {
                 )
         );
 
-        KStream<String, Reservation> updatedReservationStream = reservationResults.transformValues(()-> new ReservationResultTransformer(), Schemas.Stores.RESERVATION.name());
+        KStream<String, Reservation> updatedReservationStream = reservationResults.transformValues(
+                ()-> new ReservationResultTransformer(), Schemas.Stores.RESERVATION.name())
+                .filter((key, value) -> value != null);
 
         KStream<String, Reservation> reservationStatusUpdatedStream = reservationTable.toStream().merge(updatedReservationStream);
 
