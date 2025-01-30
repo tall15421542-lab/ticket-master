@@ -31,17 +31,20 @@ class ReservationResultTransformer implements ValueTransformer<ReservationResult
             return reservation;
         }
 
-        if (reservationResult.getResult() == ReservationResultEnum.SUCCESS) {
-            reservation.setState(StateEnum.RESERVED);
-            reservation.setSeats(reservationResult.getSeats());
-        } else if (reservationResult.getResult() == ReservationResultEnum.FAILED) {
-            reservation.setState(StateEnum.FAILED);
-            reservation.setFailedReason(
-                    String.format("[%s]: %s", reservationResult.getErrorCode(), reservationResult.getErrorMessage())
-            );
-        } else {
-            reservation.setState(StateEnum.FAILED);
-            reservation.setFailedReason(String.format("Invalid result: %s", reservationResult.getResult()));
+        switch(reservationResult.getResult()){
+            case SUCCESS: {
+                reservation.setState(StateEnum.RESERVED);
+                reservation.setSeats(reservationResult.getSeats());
+                break;
+            }
+            case FAILED: {
+                reservation.setState(StateEnum.FAILED);
+                reservation.setFailedReason(
+                        String.format("[%s]: %s", reservationResult.getErrorCode(), reservationResult.getErrorMessage())
+                );
+                break;
+            }
+            default:
         }
 
         reservationStore.put(reservationId, ValueAndTimestamp.make(reservation, Instant.now().toEpochMilli()));
