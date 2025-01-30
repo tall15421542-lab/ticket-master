@@ -14,10 +14,13 @@ import org.apache.kafka.streams.kstream.Materialized;
 import org.apache.kafka.streams.kstream.Produced;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.Stores;
+import org.apache.kafka.streams.state.ValueAndTimestamp;
 import org.checkerframework.checker.units.qual.A;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -28,7 +31,7 @@ class ReservationTransformerTest {
     TopologyTestDriver testDriver;
     TestInputTopic<String, CreateReservation> MockCreateReservationReqs;
     TestOutputTopic<String, Reservation> MockReservations;
-    KeyValueStore<String, AreaStatus> eventAreaStatusCache;
+    KeyValueStore<String, ValueAndTimestamp<AreaStatus>> eventAreaStatusCache;
 
     @BeforeEach
     void setup(){
@@ -41,10 +44,11 @@ class ReservationTransformerTest {
         builder.globalTable(
                 Schemas.Topics.STATE_EVENT_AREA_STATUS.name(),
                 Materialized.<String, AreaStatus>as(
-                                Stores.lruMap(Schemas.Stores.EVENT_AREA_STATUS_CACHE.name(), 100)
+                                Stores.inMemoryKeyValueStore(Schemas.Stores.EVENT_AREA_STATUS_CACHE.name())
                         )
                         .withKeySerde(Schemas.Stores.EVENT_AREA_STATUS_CACHE.keySerde())
                         .withValueSerde(Schemas.Stores.EVENT_AREA_STATUS_CACHE.valueSerde())
+                        .withLoggingDisabled()
         );
 
         KStream<String, CreateReservation> reqs = builder.stream(Schemas.Topics.COMMAND_RESERVATION_CREATE_RESERVATION.name(),
@@ -73,7 +77,7 @@ class ReservationTransformerTest {
         );
 
         // setup initial area status
-        eventAreaStatusCache = testDriver.getKeyValueStore(Schemas.Stores.EVENT_AREA_STATUS_CACHE.name());
+        eventAreaStatusCache = testDriver.getTimestampedKeyValueStore(Schemas.Stores.EVENT_AREA_STATUS_CACHE.name());
         List<List<SeatStatus>> seats = new ArrayList<>();
         for(int i = 0 ; i < 3 ; ++i){
             seats.add(new ArrayList<SeatStatus>());
@@ -82,7 +86,7 @@ class ReservationTransformerTest {
             }
         }
         AreaStatus areaStatus = new AreaStatus("event", "A", 100, 3, 3, 9, seats);
-        eventAreaStatusCache.put("event#A", areaStatus);
+        eventAreaStatusCache.put("event#A", ValueAndTimestamp.make(areaStatus, Instant.now().toEpochMilli()));
     }
 
     @Test
@@ -99,5 +103,58 @@ class ReservationTransformerTest {
         assertNotNull(result.key);
         expectedReservation.setReservationId(result.value.getReservationId());
         assertEquals(expectedReservation, result.value);
+    }
+
+    @Test
+    void BlockedByContinuousRandomFilterAndCreateFailedReservation(){
+        MockCreateReservationReqs.pipeInput("userId", new CreateReservation(
+                "userId", "event", "A", 4, 4, ReservationTypeEnum.RANDOM, new ArrayList<>()
+        ));
+
+        Reservation expectedReservation = new Reservation(
+                "reservationId", "userId", "event", "A", 4, 4,
+                ReservationTypeEnum.RANDOM, new ArrayList<>(), StateEnum.FAILED, "request rejected at cache level");
+
+        KeyValue<String, Reservation> result = MockReservations.readKeyValue();
+        assertNotNull(result.key);
+        expectedReservation.setReservationId(result.value.getReservationId());
+        assertEquals(expectedReservation, result.value);
+    }
+
+    @Test
+    void NonExisitingEventAreaAndCreateProcessingReservation(){
+        MockCreateReservationReqs.pipeInput("userId", new CreateReservation(
+                "userId", "event", "B", 3, 3, ReservationTypeEnum.RANDOM, new ArrayList<>()
+        ));
+
+        Reservation expectedReservation = new Reservation(
+                "reservationId", "userId", "event", "B", 3, 3,
+                ReservationTypeEnum.RANDOM, new ArrayList<>(), StateEnum.PROCESSING, "");
+
+        KeyValue<String, Reservation> result = MockReservations.readKeyValue();
+        assertNotNull(result.key);
+        expectedReservation.setReservationId(result.value.getReservationId());
+        assertEquals(expectedReservation, result.value);
+    }
+
+    @Test
+    void InvalidFilterAndCreateFailedReservation(){
+        MockCreateReservationReqs.pipeInput("userId", new CreateReservation(
+                "userId", "event", "A", 4, 4, ReservationTypeEnum.INVALID, new ArrayList<>()
+        ));
+
+        Reservation expectedReservation = new Reservation(
+                "reservationId", "userId", "event", "A", 4, 4,
+                ReservationTypeEnum.INVALID, new ArrayList<>(), StateEnum.FAILED, "INVALID type reservation is not supported");
+
+        KeyValue<String, Reservation> result = MockReservations.readKeyValue();
+        assertNotNull(result.key);
+        expectedReservation.setReservationId(result.value.getReservationId());
+        assertEquals(expectedReservation, result.value);
+    }
+
+    @AfterEach
+    void tearDown() {
+        testDriver.close();
     }
 }
