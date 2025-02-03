@@ -6,15 +6,11 @@ import lab.tall15421542.app.avro.event.SeatStatus;
 import lab.tall15421542.app.avro.reservation.*;
 import lab.tall15421542.app.domain.Schemas;
 import org.apache.kafka.streams.*;
-import org.apache.kafka.streams.kstream.Consumed;
-import org.apache.kafka.streams.kstream.KStream;
-import org.apache.kafka.streams.kstream.Produced;
 import org.apache.kafka.streams.state.KeyValueStore;
-import org.apache.kafka.streams.state.Stores;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import javax.xml.validation.Schema;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -183,5 +179,175 @@ class ServiceTest {
         KeyValue<String, Reservation> reservationUpdatedKV = MockReservationUpdated.readKeyValue();
         assertEquals(reservationId, reservationUpdatedKV.key);
         assertEquals(expectedReservation, reservationUpdatedKV.value);
+    }
+
+    @Test
+    void SuccessfulSelfPickRandomReservationForNonExistingAreaInCache(){
+        CreateReservation req = new CreateReservation(
+                "userId", "event", "B", 3, 3, ReservationTypeEnum.SELF_PICK,
+                Arrays.asList(new Seat(0,0), new Seat(0,1), new Seat(0,2))
+        );
+        MockCreateReservationRequests.pipeInput("userId", req);
+        KeyValue<String, ReserveSeat> reserveSeatReq = MockReserveSeatRequests.readKeyValue();
+
+        ReserveSeat expectedReserveSeatRequest = new ReserveSeat(
+                reserveSeatReq.value.getReservationId(), "event", "B",
+                3, 3, ReservationTypeEnum.SELF_PICK, Arrays.asList(new Seat(0,0), new Seat(0,1), new Seat(0,2))
+        );
+        assertEquals("event#B", reserveSeatReq.key);
+        assertEquals(expectedReserveSeatRequest, reserveSeatReq.value);
+
+        String reservationId = reserveSeatReq.value.getReservationId().toString();
+        Reservation expectedReservation = new Reservation(
+                reservationId, "userId", "event", "B", 3, 3, ReservationTypeEnum.SELF_PICK,
+                Arrays.asList(new Seat(0,0), new Seat(0,1), new Seat(0,2)),
+                StateEnum.PROCESSING, ""
+        );
+
+        Reservation reservation = MockReservationStore.get(reservationId);
+        assertNotNull(reservation);
+        assertEquals(expectedReservation, reservation);
+
+        assertTrue(MockReservationUpdated.isEmpty());
+
+        ReservationResult reservationResult = new ReservationResult(
+                reservationId, ReservationResultEnum.SUCCESS, Arrays.asList(new Seat(0,0), new Seat(0,1), new Seat(0,2)),
+                null, null
+        );
+
+        MockReservationResults.pipeInput(reservationId, reservationResult);
+
+        expectedReservation.setState(StateEnum.RESERVED);
+        expectedReservation.setSeats(Arrays.asList(new Seat(0,0), new Seat(0,1), new Seat(0,2)));
+        assertEquals(expectedReservation, MockReservationStore.get(reservationId));
+
+        KeyValue<String, Reservation> reservationUpdatedKV = MockReservationUpdated.readKeyValue();
+        assertEquals(reservationId, reservationUpdatedKV.key);
+        assertEquals(expectedReservation, reservationUpdatedKV.value);
+    }
+
+    @Test
+    void FailedSelfPickRandomReservation(){
+        CreateReservation req = new CreateReservation(
+                "userId", "event", "B", 3, 3, ReservationTypeEnum.SELF_PICK,
+                Arrays.asList(new Seat(0,0), new Seat(0,1), new Seat(0,2))
+        );
+        MockCreateReservationRequests.pipeInput("userId", req);
+        KeyValue<String, ReserveSeat> reserveSeatReq = MockReserveSeatRequests.readKeyValue();
+
+        ReserveSeat expectedReserveSeatRequest = new ReserveSeat(
+                reserveSeatReq.value.getReservationId(), "event", "B",
+                3, 3, ReservationTypeEnum.SELF_PICK, Arrays.asList(new Seat(0,0), new Seat(0,1), new Seat(0,2))
+        );
+        assertEquals("event#B", reserveSeatReq.key);
+        assertEquals(expectedReserveSeatRequest, reserveSeatReq.value);
+
+        String reservationId = reserveSeatReq.value.getReservationId().toString();
+        Reservation expectedReservation = new Reservation(
+                reservationId, "userId", "event", "B", 3, 3, ReservationTypeEnum.SELF_PICK,
+                Arrays.asList(new Seat(0,0), new Seat(0,1), new Seat(0,2)),
+                StateEnum.PROCESSING, ""
+        );
+
+        Reservation reservation = MockReservationStore.get(reservationId);
+        assertNotNull(reservation);
+        assertEquals(expectedReservation, reservation);
+
+        assertTrue(MockReservationUpdated.isEmpty());
+
+        ReservationResult reservationResult = new ReservationResult(
+                reservationId, ReservationResultEnum.FAILED, new ArrayList<>(),
+                ReservationErrorCodeEnum.NOT_AVAILABLE, "Seat(0,1) is not available."
+        );
+
+        MockReservationResults.pipeInput(reservationId, reservationResult);
+
+        expectedReservation.setState(StateEnum.FAILED);
+        expectedReservation.setFailedReason("[NOT_AVAILABLE]: Seat(0,1) is not available.");
+        assertEquals(expectedReservation, MockReservationStore.get(reservationId));
+
+        KeyValue<String, Reservation> reservationUpdatedKV = MockReservationUpdated.readKeyValue();
+        assertEquals(reservationId, reservationUpdatedKV.key);
+        assertEquals(expectedReservation, reservationUpdatedKV.value);
+    }
+
+    @Test
+    void FailedSelfPickRandomReservationFromCache(){
+        List<List<SeatStatus>> seats = new ArrayList<>();
+        for(int i = 0 ; i < 3 ; ++i){
+            seats.add(new ArrayList<SeatStatus>());
+            for(int j = 0 ; j < 3 ; ++j){
+                seats.get(i).add(new SeatStatus(i, j, true));
+            }
+        }
+
+        seats.get(0).get(0).setIsAvailable(false);
+        AreaStatus updatedAreaStatus = new AreaStatus("event", "A", 100, 3, 3, 9, seats);
+        MockAreaStatusUpdated.pipeInput("event#A", updatedAreaStatus);
+
+        CreateReservation req = new CreateReservation(
+                "userId", "event", "A", 3, 3, ReservationTypeEnum.SELF_PICK,
+                Arrays.asList(new Seat(0,0), new Seat(0,1), new Seat(0,2))
+        );
+        MockCreateReservationRequests.pipeInput("userId", req);
+        assertTrue(MockReserveSeatRequests.isEmpty());
+
+        KeyValue<String, Reservation> reservationUpdatedKV = MockReservationUpdated.readKeyValue();
+        String reservationId = reservationUpdatedKV.key;
+        Reservation expectedReservation = new Reservation(
+                reservationId, "userId", "event", "A", 3, 3, ReservationTypeEnum.SELF_PICK,
+                Arrays.asList(new Seat(0,0), new Seat(0,1), new Seat(0,2)),
+                StateEnum.FAILED, "request rejected at cache level"
+        );
+        assertEquals(expectedReservation, reservationUpdatedKV.value);
+
+        Reservation reservation = MockReservationStore.get(reservationId);
+        assertNotNull(reservation);
+        assertEquals(expectedReservation, reservation);
+    }
+
+    @Test
+    void NonExistingReservationResult(){
+        CreateReservation req = new CreateReservation(
+                "userId", "event", "A", 3, 3, ReservationTypeEnum.SELF_PICK,
+                Arrays.asList(new Seat(0,0), new Seat(0,1), new Seat(0,2))
+        );
+        MockCreateReservationRequests.pipeInput("userId", req);
+        KeyValue<String, ReserveSeat> reserveSeatReq = MockReserveSeatRequests.readKeyValue();
+
+        ReserveSeat expectedReserveSeatRequest = new ReserveSeat(
+                reserveSeatReq.value.getReservationId(), "event", "A",
+                3, 3, ReservationTypeEnum.SELF_PICK, Arrays.asList(new Seat(0,0), new Seat(0,1), new Seat(0,2))
+        );
+        assertEquals("event#A", reserveSeatReq.key);
+        assertEquals(expectedReserveSeatRequest, reserveSeatReq.value);
+
+        String reservationId = reserveSeatReq.value.getReservationId().toString();
+        Reservation expectedReservation = new Reservation(
+                reservationId, "userId", "event", "A", 3, 3, ReservationTypeEnum.SELF_PICK,
+                Arrays.asList(new Seat(0,0), new Seat(0,1), new Seat(0,2)),
+                StateEnum.PROCESSING, ""
+        );
+
+        Reservation reservation = MockReservationStore.get(reservationId);
+        assertNotNull(reservation);
+        assertEquals(expectedReservation, reservation);
+
+        assertTrue(MockReservationUpdated.isEmpty());
+
+        ReservationResult reservationResult = new ReservationResult(
+                "NonExisting", ReservationResultEnum.SUCCESS, Arrays.asList(new Seat(0,0), new Seat(0,1), new Seat(0,2)),
+                null, null
+        );
+
+        MockReservationResults.pipeInput(reservationId, reservationResult);
+        assertEquals(expectedReservation, MockReservationStore.get(reservationId));
+
+        assertTrue(MockReservationUpdated.isEmpty());
+    }
+
+    @AfterEach
+    void tearDown() {
+        testDriver.close();
     }
 }
