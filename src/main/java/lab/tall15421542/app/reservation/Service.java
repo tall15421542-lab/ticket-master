@@ -74,7 +74,7 @@ public class Service {
         streams.close();
     }
 
-    private static Topology createTopology() {
+    static Topology createTopology() {
         final StreamsBuilder builder = new StreamsBuilder();
 
         builder.globalTable(
@@ -124,7 +124,7 @@ public class Service {
                 ()-> new ReservationResultTransformer(), Schemas.Stores.RESERVATION.name())
                 .filter((key, value) -> value != null);
 
-        KStream<String, Reservation> reservationStatusUpdatedStream = reservationTable.toStream().merge(updatedReservationStream);
+        KStream<String, Reservation> reservationStatusUpdatedStream = repartitionedCreateReservationStream.merge(updatedReservationStream);
 
         final String PROCESSING = "processing", PROCESSED = "processed", DEFAULT = "default", PREFIX = "reservation-";
         Map<String, KStream<String, Reservation>> result = reservationStatusUpdatedStream.split(Named.as(PREFIX))
