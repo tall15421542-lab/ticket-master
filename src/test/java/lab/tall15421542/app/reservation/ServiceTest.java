@@ -139,4 +139,49 @@ class ServiceTest {
         assertEquals(reservationId, reservationUpdatedKV.key);
         assertEquals(expectedReservation, reservationUpdatedKV.value);
     }
+
+    @Test
+    void SuccessfulSelfPickRandomReservation(){
+        CreateReservation req = new CreateReservation(
+                "userId", "event", "A", 3, 3, ReservationTypeEnum.SELF_PICK,
+                Arrays.asList(new Seat(0,0), new Seat(0,1), new Seat(0,2))
+        );
+        MockCreateReservationRequests.pipeInput("userId", req);
+        KeyValue<String, ReserveSeat> reserveSeatReq = MockReserveSeatRequests.readKeyValue();
+
+        ReserveSeat expectedReserveSeatRequest = new ReserveSeat(
+                reserveSeatReq.value.getReservationId(), "event", "A",
+                3, 3, ReservationTypeEnum.SELF_PICK, Arrays.asList(new Seat(0,0), new Seat(0,1), new Seat(0,2))
+        );
+        assertEquals("event#A", reserveSeatReq.key);
+        assertEquals(expectedReserveSeatRequest, reserveSeatReq.value);
+
+        String reservationId = reserveSeatReq.value.getReservationId().toString();
+        Reservation expectedReservation = new Reservation(
+                reservationId, "userId", "event", "A", 3, 3, ReservationTypeEnum.SELF_PICK,
+                Arrays.asList(new Seat(0,0), new Seat(0,1), new Seat(0,2)),
+                StateEnum.PROCESSING, ""
+        );
+
+        Reservation reservation = MockReservationStore.get(reservationId);
+        assertNotNull(reservation);
+        assertEquals(expectedReservation, reservation);
+
+        assertTrue(MockReservationUpdated.isEmpty());
+
+        ReservationResult reservationResult = new ReservationResult(
+                reservationId, ReservationResultEnum.SUCCESS, Arrays.asList(new Seat(0,0), new Seat(0,1), new Seat(0,2)),
+                null, null
+        );
+
+        MockReservationResults.pipeInput(reservationId, reservationResult);
+
+        expectedReservation.setState(StateEnum.RESERVED);
+        expectedReservation.setSeats(Arrays.asList(new Seat(0,0), new Seat(0,1), new Seat(0,2)));
+        assertEquals(expectedReservation, MockReservationStore.get(reservationId));
+
+        KeyValue<String, Reservation> reservationUpdatedKV = MockReservationUpdated.readKeyValue();
+        assertEquals(reservationId, reservationUpdatedKV.key);
+        assertEquals(expectedReservation, reservationUpdatedKV.value);
+    }
 }
