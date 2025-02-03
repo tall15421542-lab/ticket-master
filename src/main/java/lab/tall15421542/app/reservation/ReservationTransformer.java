@@ -6,7 +6,7 @@ import lab.tall15421542.app.avro.reservation.Reservation;
 import lab.tall15421542.app.avro.reservation.ReservationTypeEnum;
 import lab.tall15421542.app.avro.reservation.StateEnum;
 import lab.tall15421542.app.domain.Schemas;
-import lab.tall15421542.app.event.RandomContinuousFilterStrategy;
+import lab.tall15421542.app.event.ContinuousRandomFilterStrategy;
 import lab.tall15421542.app.event.SelfPickFilterStrategy;
 import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.kstream.Transformer;
@@ -31,7 +31,7 @@ public class ReservationTransformer implements Transformer<String, CreateReserva
         eventAreaStatusCache = context.getStateStore(Schemas.Stores.EVENT_AREA_STATUS_CACHE.name());
         filterStrategies = new HashMap<>();
         filterStrategies.put(ReservationTypeEnum.SELF_PICK, new SelfPickFilterStrategy());
-        filterStrategies.put(ReservationTypeEnum.RANDOM, new RandomContinuousFilterStrategy());
+        filterStrategies.put(ReservationTypeEnum.RANDOM, new ContinuousRandomFilterStrategy());
     }
 
     @Override

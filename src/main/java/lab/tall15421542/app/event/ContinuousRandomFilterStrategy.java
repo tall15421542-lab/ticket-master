@@ -4,7 +4,7 @@ import lab.tall15421542.app.avro.event.AreaStatus;
 import lab.tall15421542.app.avro.reservation.CreateReservation;
 import lab.tall15421542.app.reservation.ReservationTransformer;
 
-public class RandomContinuousFilterStrategy implements ReservationTransformer.FilterStrategy {
+public class ContinuousRandomFilterStrategy implements ReservationTransformer.FilterStrategy {
     @Override
     public boolean pass(AreaStatus areaStatus, CreateReservation req) {
         int colCount = areaStatus.getColCount();
