@@ -10,12 +10,11 @@ import lab.tall15421542.app.avro.event.CreateEvent;
 
 import lab.tall15421542.app.domain.beans.ReservationBean;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.clients.producer.Callback;
+import org.apache.kafka.clients.producer.*;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.kafka.streams.*;
 import org.apache.kafka.streams.errors.InvalidStateStoreException;
 import org.apache.kafka.streams.kstream.*;
-import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.state.HostInfo;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.QueryableStoreTypes;
@@ -44,10 +43,6 @@ import jakarta.ws.rs.client.ClientBuilder;
 
 import static io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG;
 
-import org.apache.kafka.clients.producer.KafkaProducer;
-import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.clients.producer.ProducerConfig;
-
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -64,13 +59,13 @@ import org.apache.commons.cli.Options;
 
 @Path("v1")
 public class Service {
-    private KafkaProducer<String, CreateEvent> createEventProducer;
-    private KafkaProducer<String, CreateReservation> CreateReservationProducer;
+    Producer<String, CreateEvent> createEventProducer;
+    Producer<String, CreateReservation> createReservationProducer;
     private String hostname;
     private int port;
     private KafkaStreams streams;
-    private final Map<String, AsyncResponse> outstandingRequests = new ConcurrentHashMap<>();
-    private final Client client = ClientBuilder.newBuilder().register(JacksonFeature.class).build();
+    final Map<String, AsyncResponse> outstandingRequests = new ConcurrentHashMap<>();
+    final Client client = ClientBuilder.newBuilder().register(JacksonFeature.class).build();
 
     public Service(String hostname, int port){
         this.hostname = hostname;
@@ -119,7 +114,7 @@ public class Service {
 
     public void start(String bootstrapServers, Properties config){
         createEventProducer = startProducer(bootstrapServers, Schemas.Topics.COMMAND_EVENT_CREATE_EVENT, config);
-        CreateReservationProducer = startProducer(bootstrapServers, Schemas.Topics.COMMAND_RESERVATION_CREATE_RESERVATION, config);
+        createReservationProducer = startProducer(bootstrapServers, Schemas.Topics.COMMAND_RESERVATION_CREATE_RESERVATION, config);
         this.streams = startKafkaStream(bootstrapServers, config);
 
         startJetty(this.port, this);
@@ -130,6 +125,22 @@ public class Service {
     }
 
     private KafkaStreams startKafkaStream(String bootstrapServers, Properties config){
+        final Topology topology = createTopology();
+        System.out.println(topology.describe());
+
+        Properties props = new Properties();
+        props.putAll(config);
+        props.put(StreamsConfig.APPLICATION_ID_CONFIG, "ticket-service");
+        props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
+        props.put(StreamsConfig.APPLICATION_SERVER_CONFIG, this.hostname + ":" + this.port);
+
+        KafkaStreams streams = new KafkaStreams(topology, props);
+        streams.start();
+        return streams;
+    }
+
+    Topology createTopology(){
         final StreamsBuilder builder = new StreamsBuilder();
         KStream<String, Reservation> reservationStream = builder.stream(
                 Schemas.Topics.STATE_USER_RESERVATION.name(),
@@ -151,38 +162,7 @@ public class Service {
             }
         });
 
-        final Topology topology = builder.build();
-        System.out.println(topology.describe());
-
-        Properties props = new Properties();
-        props.putAll(config);
-        props.put(StreamsConfig.APPLICATION_ID_CONFIG, "ticket-service");
-        props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
-        props.put(StreamsConfig.APPLICATION_SERVER_CONFIG, this.hostname + ":" + this.port);
-
-        KafkaStreams streams = new KafkaStreams(topology, props);
-        streams.start();
-        return streams;
-    }
-
-    private static class ReservationTransformer implements Transformer<String, Reservation, KeyValue<String, Reservation>> {
-        private ProcessorContext context;
-        @Override
-        public void init(ProcessorContext context){
-            this.context = context;
-        }
-
-        @Override
-        public KeyValue<String, Reservation> transform(String reservationId, Reservation reservation){
-           String requestId = new String(this.context.headers().lastHeader("request-id").value());
-           return KeyValue.pair(requestId, reservation);
-        }
-
-        @Override
-        public void close(){
-
-        }
+        return builder.build();
     }
 
     @GET
@@ -229,7 +209,7 @@ public class Service {
         String requestId = UUID.randomUUID().toString();
         System.out.println("request-id: " + requestId);
         record.headers().add("request-id", requestId.getBytes(StandardCharsets.UTF_8));
-        CreateReservationProducer.send(record, createReservationCallback(asyncResponse, requestId));
+        createReservationProducer.send(record, createReservationCallback(asyncResponse, requestId));
     }
 
     private Callback createReservationCallback(final AsyncResponse asyncResponse, final String requestId){
@@ -252,7 +232,6 @@ public class Service {
                     if(hostForKey.host().equals(this.hostname) && hostForKey.port() == this.port){
                         fetchReservationFromLocal(requestId, asyncResponse);
                     }else{
-                        // TODO: fetch from other host
                         final String path = "http://" + hostForKey.host() + ":" + hostForKey.port() + "/v1/reservation/" + requestId;
                         fetchReservationFromOtherHost(path, asyncResponse);
                     }
