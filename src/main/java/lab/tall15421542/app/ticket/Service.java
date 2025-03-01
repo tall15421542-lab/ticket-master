@@ -121,6 +121,8 @@ public class Service {
     }
 
     public void close(){
+        createEventProducer.close();
+        createReservationProducer.close();
         this.streams.close();
     }
 
@@ -191,7 +193,15 @@ public class Service {
     public void createEvent(final EventBean eventBean,
                          @Suspended final AsyncResponse asyncResponse) {
         CreateEvent req = eventBean.toAvro();
-        createEventProducer.send(new ProducerRecord<String, CreateEvent>(Schemas.Topics.COMMAND_EVENT_CREATE_EVENT.name(), req.getEventName().toString(), req));
+        ProducerRecord<String, CreateEvent> record = new ProducerRecord<>(
+            Schemas.Topics.COMMAND_EVENT_CREATE_EVENT.name(),
+            req.getEventName().toString(), req
+        );
+        createEventProducer.send(record, (RecordMetadata metadata, Exception exception) -> {
+            if(exception != null){
+                asyncResponse.resume(exception);
+            }
+        });
         asyncResponse.resume(eventBean);
     }
 
@@ -335,7 +345,6 @@ public class Service {
         producerConfig.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, "true");
         producerConfig.put(ProducerConfig.RETRIES_CONFIG, String.valueOf(Integer.MAX_VALUE));
         producerConfig.put(ProducerConfig.ACKS_CONFIG, "all");
-        producerConfig.put(ProducerConfig.CLIENT_ID_CONFIG, "create-event-sender");
 
         return new KafkaProducer<>(producerConfig,
                 topic.keySerde().serializer(),
