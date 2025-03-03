@@ -5,8 +5,22 @@ import lab.tall15421542.app.avro.reservation.Seat;
 
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Objects;
 
 public class ReservationBean {
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        ReservationBean that = (ReservationBean) o;
+        return getNumOfSeats() == that.getNumOfSeats() && getNumOfSeat() == that.getNumOfSeat() && Objects.equals(getReservationId(), that.getReservationId()) && Objects.equals(getUserId(), that.getUserId()) && Objects.equals(getEventId(), that.getEventId()) && Objects.equals(getAreaId(), that.getAreaId()) && Objects.equals(getType(), that.getType()) && Objects.equals(getSeats(), that.getSeats()) && Objects.equals(getState(), that.getState()) && Objects.equals(getFailedReason(), that.getFailedReason());
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(getReservationId(), getUserId(), getEventId(), getAreaId(), getNumOfSeats(), getNumOfSeat(), getType(), getSeats(), getState(), getFailedReason());
+    }
+
     public static class SeatBean{
         private int row;
         private int col;
@@ -28,6 +42,19 @@ public class ReservationBean {
         }
         public void setCol(int col) {
             this.col = col;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            SeatBean seatBean = (SeatBean) o;
+            return getRow() == seatBean.getRow() && getCol() == seatBean.getCol();
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(getRow(), getCol());
         }
     };
 

@@ -11,6 +11,7 @@ import lab.tall15421542.app.avro.event.CreateEvent;
 import lab.tall15421542.app.domain.beans.ReservationBean;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.*;
+import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.kafka.streams.*;
 import org.apache.kafka.streams.errors.InvalidStateStoreException;
@@ -50,6 +51,8 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.DefaultParser;
@@ -63,7 +66,7 @@ public class Service {
     Producer<String, CreateReservation> createReservationProducer;
     private String hostname;
     private int port;
-    private KafkaStreams streams;
+    KafkaStreams streams;
     final Map<String, AsyncResponse> outstandingRequests = new ConcurrentHashMap<>();
     final Client client = ClientBuilder.newBuilder().register(JacksonFeature.class).build();
 
@@ -136,9 +139,27 @@ public class Service {
         props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
         props.put(StreamsConfig.APPLICATION_SERVER_CONFIG, this.hostname + ":" + this.port);
+        props.put(StreamsConfig.METRICS_RECORDING_LEVEL_CONFIG, "DEBUG");
 
         KafkaStreams streams = new KafkaStreams(topology, props);
+
+        final CountDownLatch startLatch = new CountDownLatch(1);
+        streams.setStateListener((newState, oldState) -> {
+            if (newState == KafkaStreams.State.RUNNING && oldState != KafkaStreams.State.RUNNING) {
+                startLatch.countDown();
+            }
+        });
+
         streams.start();
+
+        try {
+            if (!startLatch.await(60, TimeUnit.SECONDS)) {
+                throw new RuntimeException("Streams never finished rebalancing on startup");
+            }
+        } catch (final InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
         return streams;
     }
 
@@ -169,20 +190,15 @@ public class Service {
 
     @GET
     @ManagedAsync
-    @Path("/event/{id}")
-    @Produces({MediaType.TEXT_PLAIN})
-    public void getEvent(@PathParam("id") final String id,
-                          @Suspended final AsyncResponse asyncResponse) {
-        asyncResponse.resume(id);
-    }
-
-    @GET
-    @ManagedAsync
     @Path("/reservation/{request_id}")
     @Produces({MediaType.APPLICATION_JSON})
     public void getReservationByRequestId(@PathParam("request_id") final String requestId,
                          @Suspended final AsyncResponse asyncResponse) {
-        fetchReservationFromLocal(requestId, asyncResponse);
+        try{
+            fetchReservation(asyncResponse, requestId);
+        } catch (final InvalidStateStoreException e) {
+            outstandingRequests.put(requestId, asyncResponse);
+        }
     }
 
     @POST
@@ -226,30 +242,34 @@ public class Service {
         return (recordMetadata, e) -> {
             if (e != null) {
                 asyncResponse.resume(e);
-            } else {
-                try {
-                    // get key metadata
-                    // if it's in local, fetch from local
-                    // if it's in another host fetch from GET /reservation/request_id/{} internal endpoint;
-                    HostInfo hostForKey = getKeyLocationOrBlock(requestId, asyncResponse);
-                    if (hostForKey == null) { //request timed out so return
-                        asyncResponse.resume(Response.status(Response.Status.GATEWAY_TIMEOUT)
-                                .entity("HTTP GET timed out after \n")
-                                .build());
-                        return;
-                    }
+            }
 
-                    if(hostForKey.host().equals(this.hostname) && hostForKey.port() == this.port){
-                        fetchReservationFromLocal(requestId, asyncResponse);
-                    }else{
-                        final String path = "http://" + hostForKey.host() + ":" + hostForKey.port() + "/v1/reservation/" + requestId;
-                        fetchReservationFromOtherHost(path, asyncResponse);
-                    }
-                } catch (final InvalidStateStoreException e2) {
-                    outstandingRequests.put(requestId, asyncResponse);
-                }
+            try{
+                fetchReservation(asyncResponse, requestId);
+            } catch (final InvalidStateStoreException e2) {
+                outstandingRequests.put(requestId, asyncResponse);
             }
         };
+    }
+
+    private void fetchReservation(final AsyncResponse asyncResponse, final String requestId) throws InvalidStateStoreException {
+        // get key metadata
+        // if it's in local, fetch from local
+        // if it's in another host fetch from GET /reservation/request_id/{} internal endpoint;
+        HostInfo hostForKey = getKeyLocationOrBlock(requestId, asyncResponse);
+        if (hostForKey == null) { //request timed out so return
+            asyncResponse.resume(Response.status(Response.Status.GATEWAY_TIMEOUT)
+                    .entity("HTTP GET timed out after \n")
+                    .build());
+            return;
+        }
+
+        if(hostForKey.host().equals(this.hostname) && hostForKey.port() == this.port){
+            fetchReservationFromLocal(requestId, asyncResponse);
+        }else{
+            final String path = "http://" + hostForKey.host() + ":" + hostForKey.port() + "/v1/reservation/" + requestId;
+            fetchReservationFromOtherHost(path, asyncResponse);
+        }
     }
 
     private void fetchReservationFromLocal(String requestId, AsyncResponse asyncResponse){

@@ -66,6 +66,7 @@ public class Service {
         props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:29092");
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         props.put(StreamsConfig.STATE_DIR_CONFIG, stateDir);
+        props.put(StreamsConfig.METRICS_RECORDING_LEVEL_CONFIG, "DEBUG");
 
         KafkaStreams streams = new KafkaStreams(topology, props);
         streams.start();

@@ -15,6 +15,15 @@ public class CreateReservationBean {
     private List<SeatBean> seats;
     private String type;
 
+    public CreateReservationBean(){}
+    public CreateReservationBean(String userId, String eventId, String areaId, int numOfSeats, List<SeatBean> seats, String type){
+        this.userId = userId;
+        this.eventId = eventId;
+        this.areaId = areaId;
+        this.numOfSeats = numOfSeats;
+        this.seats = seats;
+        this.type = type;
+    }
     // Getters and Setters
 
     public String getUserId() {
@@ -72,6 +81,11 @@ public class CreateReservationBean {
         private int col;
 
         // Getters and Setters
+        public SeatBean(){}
+        public SeatBean(int row, int col){
+            this.row = row;
+            this.col = col;
+        }
 
         public int getRow() {
             return row;
