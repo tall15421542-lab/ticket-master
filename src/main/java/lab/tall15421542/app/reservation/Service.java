@@ -95,17 +95,10 @@ public class Service {
                 )
         );
 
-        // key: userId -> reservationId
+        // key: reservationId
         KStream<String, Reservation> createReservationStream = reservationRequests.processValues(ReservationValueProcessor::new);
 
-        // ensure reservation store has the same partition counts as the reservation partitions.
-        KStream<String, Reservation> repartitionedCreateReservationStream = createReservationStream.repartition(
-                Repartitioned.<String,Reservation>numberOfPartitions(20)
-                        .withKeySerde(Schemas.Stores.RESERVATION.keySerde())
-                        .withValueSerde(Schemas.Stores.RESERVATION.valueSerde())
-        );
-
-        KTable<String, Reservation> reservationTable = repartitionedCreateReservationStream.toTable(
+        KTable<String, Reservation> reservationTable = createReservationStream.toTable(
                 Materialized.<String, Reservation, KeyValueStore<Bytes, byte[]>>as(Schemas.Stores.RESERVATION.name())
                         .withKeySerde(Schemas.Stores.RESERVATION.keySerde())
                         .withValueSerde(Schemas.Stores.RESERVATION.valueSerde())
@@ -124,7 +117,7 @@ public class Service {
                 ()-> new ReservationResultTransformer(), Schemas.Stores.RESERVATION.name())
                 .filter((key, value) -> value != null);
 
-        KStream<String, Reservation> reservationStatusUpdatedStream = repartitionedCreateReservationStream.merge(updatedReservationStream);
+        KStream<String, Reservation> reservationStatusUpdatedStream = createReservationStream.merge(updatedReservationStream);
 
         final String PROCESSING = "processing", PROCESSED = "processed", DEFAULT = "default", PREFIX = "reservation-";
         Map<String, KStream<String, Reservation>> result = reservationStatusUpdatedStream.split(Named.as(PREFIX))
