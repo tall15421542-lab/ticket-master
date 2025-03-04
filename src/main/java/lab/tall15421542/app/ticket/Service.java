@@ -172,14 +172,14 @@ public class Service {
                         Schemas.Topics.STATE_USER_RESERVATION.valueSerde()
                 ));
 
-        KTable<String, Reservation> reservationTable = reservationStream.transform(() -> new ReservationTransformer()).toTable(
-                Materialized.<String, Reservation, KeyValueStore<Bytes, byte[]>>as(Schemas.Stores.REQUEST_ID_RESERVATION.name())
-                        .withKeySerde(Schemas.Stores.REQUEST_ID_RESERVATION.keySerde())
-                        .withValueSerde(Schemas.Stores.REQUEST_ID_RESERVATION.valueSerde())
+        KTable<String, Reservation> reservationTable = reservationStream.toTable(
+                Materialized.<String, Reservation, KeyValueStore<Bytes, byte[]>>as(Schemas.Stores.RESERVATION.name())
+                        .withKeySerde(Schemas.Stores.RESERVATION.keySerde())
+                        .withValueSerde(Schemas.Stores.RESERVATION.valueSerde())
                         .withCachingDisabled());
 
-        reservationTable.toStream().foreach((requestId, reservation) -> {
-            final AsyncResponse asyncResponse = outstandingRequests.get(requestId);
+        reservationTable.toStream().foreach((reservationId, reservation) -> {
+            final AsyncResponse asyncResponse = outstandingRequests.get(reservationId);
             if (asyncResponse != null) {
                 asyncResponse.resume(ReservationBean.fromAvro(reservation));
             }
@@ -190,14 +190,14 @@ public class Service {
 
     @GET
     @ManagedAsync
-    @Path("/reservation/{request_id}")
+    @Path("/reservation/{reservation_id}")
     @Produces({MediaType.APPLICATION_JSON})
-    public void getReservationByRequestId(@PathParam("request_id") final String requestId,
+    public void getReservationById(@PathParam("reservation_id") final String reservationId,
                          @Suspended final AsyncResponse asyncResponse) {
         try{
-            fetchReservation(asyncResponse, requestId);
+            fetchReservation(asyncResponse, reservationId);
         } catch (final InvalidStateStoreException e) {
-            outstandingRequests.put(requestId, asyncResponse);
+            outstandingRequests.put(reservationId, asyncResponse);
         }
     }
 
@@ -229,25 +229,22 @@ public class Service {
     public void createReservation(final CreateReservationBean createReservationBean,
                                   @Suspended final AsyncResponse asyncResponse){
         CreateReservation req = createReservationBean.toAvro();
+        String reservationId = UUID.randomUUID().toString();
         ProducerRecord<String, CreateReservation> record = new ProducerRecord<>(
-                Schemas.Topics.COMMAND_RESERVATION_CREATE_RESERVATION.name(), req.getUserId().toString(), req);
-
-        String requestId = UUID.randomUUID().toString();
-        System.out.println("request-id: " + requestId);
-        record.headers().add("request-id", requestId.getBytes(StandardCharsets.UTF_8));
+                Schemas.Topics.COMMAND_RESERVATION_CREATE_RESERVATION.name(), reservationId, req);
         createReservationProducer.send(record,((recordMetadata, e) -> {
             if(e != null){
                 asyncResponse.resume(e);
             }
-            asyncResponse.resume(requestId);
+            asyncResponse.resume(reservationId);
         }));
     }
 
-    private void fetchReservation(final AsyncResponse asyncResponse, final String requestId) throws InvalidStateStoreException {
+    private void fetchReservation(final AsyncResponse asyncResponse, final String reservationId) throws InvalidStateStoreException {
         // get key metadata
         // if it's in local, fetch from local
-        // if it's in another host fetch from GET /reservation/request_id/{} internal endpoint;
-        HostInfo hostForKey = getKeyLocationOrBlock(requestId, asyncResponse);
+        // if it's in another host fetch from GET /reservation/{reservation_id} internal endpoint;
+        HostInfo hostForKey = getKeyLocationOrBlock(reservationId, asyncResponse);
         if (hostForKey == null) { //request timed out so return
             asyncResponse.resume(Response.status(Response.Status.GATEWAY_TIMEOUT)
                     .entity("HTTP GET timed out after \n")
@@ -256,17 +253,17 @@ public class Service {
         }
 
         if(hostForKey.host().equals(this.hostname) && hostForKey.port() == this.port){
-            fetchReservationFromLocal(requestId, asyncResponse);
+            fetchReservationFromLocal(reservationId, asyncResponse);
         }else{
-            final String path = "http://" + hostForKey.host() + ":" + hostForKey.port() + "/v1/reservation/" + requestId;
+            final String path = "http://" + hostForKey.host() + ":" + hostForKey.port() + "/v1/reservation/" + reservationId;
             fetchReservationFromOtherHost(path, asyncResponse);
         }
     }
 
-    private void fetchReservationFromLocal(String requestId, AsyncResponse asyncResponse){
-        final Reservation reservation = reservationStore().get(requestId);
+    private void fetchReservationFromLocal(String reservationId, AsyncResponse asyncResponse){
+        final Reservation reservation = reservationStore().get(reservationId);
         if(reservation == null){
-            outstandingRequests.put(requestId, asyncResponse);
+            outstandingRequests.put(reservationId, asyncResponse);
         }else{
             asyncResponse.resume(ReservationBean.fromAvro(reservation));
         }
@@ -290,8 +287,8 @@ public class Service {
         while (locationOfKey == null) {
             try {
                 KeyQueryMetadata metadata = this.streams.queryMetadataForKey(
-                        Schemas.Stores.REQUEST_ID_RESERVATION.name(),
-                        id, Schemas.Stores.REQUEST_ID_RESERVATION.keySerde().serializer()
+                        Schemas.Stores.RESERVATION.name(),
+                        id, Schemas.Stores.RESERVATION.keySerde().serializer()
                 );
 
                 if(metadata != KeyQueryMetadata.NOT_AVAILABLE){
@@ -319,7 +316,7 @@ public class Service {
     private ReadOnlyKeyValueStore<String, Reservation> reservationStore() {
         return streams.store(
                 StoreQueryParameters.fromNameAndType(
-                        Schemas.Stores.REQUEST_ID_RESERVATION.name(),
+                        Schemas.Stores.RESERVATION.name(),
                         QueryableStoreTypes.keyValueStore()));
     }
 
