@@ -21,7 +21,7 @@ import java.util.Properties;
 import static io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG;
 import static org.junit.jupiter.api.Assertions.*;
 
-class ReservationResultTransformerTest {
+class ReservationResultValueProcessorTest {
     TopologyTestDriver testDriver;
     TestInputTopic<String, ReservationResult> MockReservationResults;
     TestOutputTopic<String, Reservation> MockReservations;
@@ -49,7 +49,7 @@ class ReservationResultTransformerTest {
                 )
         );
 
-        responses.transformValues(ReservationResultTransformer::new, Schemas.Stores.RESERVATION.name())
+        responses.processValues(ReservationResultValueProcessor::new, Schemas.Stores.RESERVATION.name())
                 .to("reservation", Produced.with(
                    Schemas.Stores.RESERVATION.keySerde(),
                    Schemas.Stores.RESERVATION.valueSerde()

@@ -97,7 +97,7 @@ class ServiceTest {
         CreateReservation req = new CreateReservation(
                 "userId", "event", "A", 3, 3, ReservationTypeEnum.RANDOM, new ArrayList<>()
         );
-        MockCreateReservationRequests.pipeInput("userId", req);
+        MockCreateReservationRequests.pipeInput("reservationId", req);
         KeyValue<String, ReserveSeat> reserveSeatReq = MockReserveSeatRequests.readKeyValue();
 
         ReserveSeat expectedReserveSeatRequest = new ReserveSeat(
@@ -142,7 +142,7 @@ class ServiceTest {
                 "userId", "event", "A", 3, 3, ReservationTypeEnum.SELF_PICK,
                 Arrays.asList(new Seat(0,0), new Seat(0,1), new Seat(0,2))
         );
-        MockCreateReservationRequests.pipeInput("userId", req);
+        MockCreateReservationRequests.pipeInput("reservationId", req);
         KeyValue<String, ReserveSeat> reserveSeatReq = MockReserveSeatRequests.readKeyValue();
 
         ReserveSeat expectedReserveSeatRequest = new ReserveSeat(
@@ -187,7 +187,7 @@ class ServiceTest {
                 "userId", "event", "B", 3, 3, ReservationTypeEnum.SELF_PICK,
                 Arrays.asList(new Seat(0,0), new Seat(0,1), new Seat(0,2))
         );
-        MockCreateReservationRequests.pipeInput("userId", req);
+        MockCreateReservationRequests.pipeInput("reservationId", req);
         KeyValue<String, ReserveSeat> reserveSeatReq = MockReserveSeatRequests.readKeyValue();
 
         ReserveSeat expectedReserveSeatRequest = new ReserveSeat(
@@ -232,7 +232,7 @@ class ServiceTest {
                 "userId", "event", "B", 3, 3, ReservationTypeEnum.SELF_PICK,
                 Arrays.asList(new Seat(0,0), new Seat(0,1), new Seat(0,2))
         );
-        MockCreateReservationRequests.pipeInput("userId", req);
+        MockCreateReservationRequests.pipeInput("reservationId", req);
         KeyValue<String, ReserveSeat> reserveSeatReq = MockReserveSeatRequests.readKeyValue();
 
         ReserveSeat expectedReserveSeatRequest = new ReserveSeat(
@@ -289,7 +289,7 @@ class ServiceTest {
                 "userId", "event", "A", 3, 3, ReservationTypeEnum.SELF_PICK,
                 Arrays.asList(new Seat(0,0), new Seat(0,1), new Seat(0,2))
         );
-        MockCreateReservationRequests.pipeInput("userId", req);
+        MockCreateReservationRequests.pipeInput("reservationId", req);
         assertTrue(MockReserveSeatRequests.isEmpty());
 
         KeyValue<String, Reservation> reservationUpdatedKV = MockReservationUpdated.readKeyValue();
@@ -312,7 +312,7 @@ class ServiceTest {
                 "userId", "event", "A", 3, 3, ReservationTypeEnum.SELF_PICK,
                 Arrays.asList(new Seat(0,0), new Seat(0,1), new Seat(0,2))
         );
-        MockCreateReservationRequests.pipeInput("userId", req);
+        MockCreateReservationRequests.pipeInput("reservationId", req);
         KeyValue<String, ReserveSeat> reserveSeatReq = MockReserveSeatRequests.readKeyValue();
 
         ReserveSeat expectedReserveSeatRequest = new ReserveSeat(
@@ -340,7 +340,7 @@ class ServiceTest {
                 null, null
         );
 
-        MockReservationResults.pipeInput(reservationId, reservationResult);
+        MockReservationResults.pipeInput("NonExisting", reservationResult);
         assertEquals(expectedReservation, MockReservationStore.get(reservationId));
 
         assertTrue(MockReservationUpdated.isEmpty());
