@@ -8,26 +8,27 @@ import lab.tall15421542.app.avro.reservation.StateEnum;
 import lab.tall15421542.app.domain.Schemas;
 import lab.tall15421542.app.event.ContinuousRandomFilterStrategy;
 import lab.tall15421542.app.event.SelfPickFilterStrategy;
-import org.apache.kafka.streams.KeyValue;
-import org.apache.kafka.streams.kstream.Transformer;
-import org.apache.kafka.streams.processor.ProcessorContext;
+import org.apache.kafka.streams.processor.api.FixedKeyProcessor;
+import org.apache.kafka.streams.processor.api.FixedKeyProcessorContext;
+import org.apache.kafka.streams.processor.api.FixedKeyRecord;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.ValueAndTimestamp;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 
-public class ReservationTransformer implements Transformer<String, CreateReservation, KeyValue<String, Reservation>> {
+public class ReservationValueProcessor implements FixedKeyProcessor<String, CreateReservation, Reservation> {
     private KeyValueStore<String, ValueAndTimestamp<AreaStatus>> eventAreaStatusCache;
     private Map<ReservationTypeEnum, FilterStrategy> filterStrategies;
+    private FixedKeyProcessorContext<String, Reservation> context;
 
     public static interface FilterStrategy {
         boolean pass(AreaStatus areaStatus, CreateReservation req);
     }
 
     @Override
-    public void init(ProcessorContext context) {
+    public void init(FixedKeyProcessorContext<String, Reservation> context) {
+        this.context = context;
         eventAreaStatusCache = context.getStateStore(Schemas.Stores.EVENT_AREA_STATUS_CACHE.name());
         filterStrategies = new HashMap<>();
         filterStrategies.put(ReservationTypeEnum.SELF_PICK, new SelfPickFilterStrategy());
@@ -35,11 +36,12 @@ public class ReservationTransformer implements Transformer<String, CreateReserva
     }
 
     @Override
-    public KeyValue<String, Reservation> transform(String userId, CreateReservation req) {
-        String reservationId = UUID.randomUUID().toString();
+    public void process(FixedKeyRecord<String, CreateReservation> record) {
+        String reservationId = record.key();
+        CreateReservation req = record.value();
         Reservation reservation = new Reservation(
                 reservationId,
-                userId,
+                req.getUserId(),
                 req.getEventId(),
                 req.getAreaId(),
                 req.getNumOfSeats(),
@@ -56,23 +58,26 @@ public class ReservationTransformer implements Transformer<String, CreateReserva
 
         // eventAreaId is not in the cache, forward to event service;
         if (areaStatus == null) {
-            return KeyValue.pair(reservationId, reservation);
+            this.context.forward(record.withValue(reservation));
+            return;
         }
 
         FilterStrategy filter = filterStrategies.get(req.getType());
         if (filter == null) {
             reservation.setState(StateEnum.FAILED);
             reservation.setFailedReason(String.format("%s type reservation is not supported", req.getType().toString()));
-            return KeyValue.pair(reservationId, reservation);
+            this.context.forward(record.withValue(reservation));
+            return;
         }
 
         if (filter.pass(areaStatus, req)) {
-            return KeyValue.pair(reservationId, reservation);
+            this.context.forward(record.withValue(reservation));
+            return;
         }
 
         reservation.setState(StateEnum.FAILED);
         reservation.setFailedReason(String.format("request rejected at cache level"));
-        return KeyValue.pair(reservationId, reservation);
+        this.context.forward(record.withValue(reservation));
     }
 
     @Override

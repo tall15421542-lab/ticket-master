@@ -3,9 +3,9 @@ package lab.tall15421542.app.event;
 import lab.tall15421542.app.avro.event.AreaStatus;
 import lab.tall15421542.app.avro.reservation.CreateReservation;
 import lab.tall15421542.app.avro.reservation.Seat;
-import lab.tall15421542.app.reservation.ReservationTransformer;
+import lab.tall15421542.app.reservation.ReservationValueProcessor;
 
-public class SelfPickFilterStrategy implements ReservationTransformer.FilterStrategy {
+public class SelfPickFilterStrategy implements ReservationValueProcessor.FilterStrategy {
     @Override
     public boolean pass(AreaStatus areaStatus, CreateReservation req) {
         int rowCount = areaStatus.getRowCount(), colCount = areaStatus.getColCount();

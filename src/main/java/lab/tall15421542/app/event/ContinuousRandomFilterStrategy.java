@@ -2,9 +2,9 @@ package lab.tall15421542.app.event;
 
 import lab.tall15421542.app.avro.event.AreaStatus;
 import lab.tall15421542.app.avro.reservation.CreateReservation;
-import lab.tall15421542.app.reservation.ReservationTransformer;
+import lab.tall15421542.app.reservation.ReservationValueProcessor;
 
-public class ContinuousRandomFilterStrategy implements ReservationTransformer.FilterStrategy {
+public class ContinuousRandomFilterStrategy implements ReservationValueProcessor.FilterStrategy {
     @Override
     public boolean pass(AreaStatus areaStatus, CreateReservation req) {
         int colCount = areaStatus.getColCount();
