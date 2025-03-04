@@ -225,7 +225,7 @@ public class Service {
     @ManagedAsync
     @Path("/event/{id}/reservation")
     @Consumes({MediaType.APPLICATION_JSON})
-    @Produces({MediaType.APPLICATION_JSON})
+    @Produces({MediaType.TEXT_PLAIN})
     public void createReservation(final CreateReservationBean createReservationBean,
                                   @Suspended final AsyncResponse asyncResponse){
         CreateReservation req = createReservationBean.toAvro();
@@ -235,21 +235,12 @@ public class Service {
         String requestId = UUID.randomUUID().toString();
         System.out.println("request-id: " + requestId);
         record.headers().add("request-id", requestId.getBytes(StandardCharsets.UTF_8));
-        createReservationProducer.send(record, createReservationCallback(asyncResponse, requestId));
-    }
-
-    private Callback createReservationCallback(final AsyncResponse asyncResponse, final String requestId){
-        return (recordMetadata, e) -> {
-            if (e != null) {
+        createReservationProducer.send(record,((recordMetadata, e) -> {
+            if(e != null){
                 asyncResponse.resume(e);
             }
-
-            try{
-                fetchReservation(asyncResponse, requestId);
-            } catch (final InvalidStateStoreException e2) {
-                outstandingRequests.put(requestId, asyncResponse);
-            }
-        };
+            asyncResponse.resume(requestId);
+        }));
     }
 
     private void fetchReservation(final AsyncResponse asyncResponse, final String requestId) throws InvalidStateStoreException {
