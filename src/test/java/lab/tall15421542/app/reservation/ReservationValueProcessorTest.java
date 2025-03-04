@@ -15,7 +15,6 @@ import org.apache.kafka.streams.kstream.Produced;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.Stores;
 import org.apache.kafka.streams.state.ValueAndTimestamp;
-import org.checkerframework.checker.units.qual.A;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,7 +26,7 @@ import java.util.Properties;
 
 import static io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG;
 import static org.junit.jupiter.api.Assertions.*;
-class ReservationTransformerTest {
+class ReservationValueProcessorTest {
     TopologyTestDriver testDriver;
     TestInputTopic<String, CreateReservation> MockCreateReservationReqs;
     TestOutputTopic<String, Reservation> MockReservations;
@@ -57,7 +56,7 @@ class ReservationTransformerTest {
                         Schemas.Topics.COMMAND_RESERVATION_CREATE_RESERVATION.valueSerde()
                 ));
 
-        reqs.transform(ReservationTransformer::new).to("reservation", Produced.with(
+        reqs.processValues(ReservationValueProcessor::new).to("reservation", Produced.with(
                 Schemas.Stores.RESERVATION.keySerde(),
                 Schemas.Stores.RESERVATION.valueSerde()
         ));

@@ -96,8 +96,7 @@ public class Service {
         );
 
         // key: userId -> reservationId
-        KStream<String, Reservation> createReservationStream = reservationRequests.transform(
-                ReservationTransformer::new);
+        KStream<String, Reservation> createReservationStream = reservationRequests.processValues(ReservationValueProcessor::new);
 
         // ensure reservation store has the same partition counts as the reservation partitions.
         KStream<String, Reservation> repartitionedCreateReservationStream = createReservationStream.repartition(

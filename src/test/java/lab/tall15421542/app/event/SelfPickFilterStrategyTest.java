@@ -5,7 +5,7 @@ import lab.tall15421542.app.avro.event.SeatStatus;
 import lab.tall15421542.app.avro.reservation.CreateReservation;
 import lab.tall15421542.app.avro.reservation.ReservationTypeEnum;
 import lab.tall15421542.app.avro.reservation.Seat;
-import lab.tall15421542.app.reservation.ReservationTransformer;
+import lab.tall15421542.app.reservation.ReservationValueProcessor;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -30,7 +30,7 @@ class SelfPickFilterStrategyTest {
                 Arrays.asList(new Seat(0,0), new Seat(0,1), new Seat(0,2))
         );
 
-        ReservationTransformer.FilterStrategy strategy = new SelfPickFilterStrategy();
+        ReservationValueProcessor.FilterStrategy strategy = new SelfPickFilterStrategy();
         assertTrue(strategy.pass(areaStatus, req));
     }
 
@@ -50,7 +50,7 @@ class SelfPickFilterStrategyTest {
                 Arrays.asList(new Seat(0,0), new Seat(0,1), new Seat(0,2))
         );
 
-        ReservationTransformer.FilterStrategy strategy = new SelfPickFilterStrategy();
+        ReservationValueProcessor.FilterStrategy strategy = new SelfPickFilterStrategy();
         assertFalse(strategy.pass(areaStatus, req));
     }
 
@@ -70,7 +70,7 @@ class SelfPickFilterStrategyTest {
                 Arrays.asList(new Seat(0,4))
         );
 
-        ReservationTransformer.FilterStrategy strategy = new SelfPickFilterStrategy();
+        ReservationValueProcessor.FilterStrategy strategy = new SelfPickFilterStrategy();
         assertFalse(strategy.pass(areaStatus, req));
 
         req.setSeats(Arrays.asList(new Seat(0, -1)));

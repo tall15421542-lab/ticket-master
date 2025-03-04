@@ -11,7 +11,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import lab.tall15421542.app.reservation.ReservationTransformer;
+import lab.tall15421542.app.reservation.ReservationValueProcessor;
 
 class ContinuousRandomFilterStrategyTest {
     @Test
@@ -28,7 +28,7 @@ class ContinuousRandomFilterStrategyTest {
                 "userId", "event", "A", 3, 3, ReservationTypeEnum.RANDOM, new ArrayList<>()
         );
 
-        ReservationTransformer.FilterStrategy strategy = new ContinuousRandomFilterStrategy();
+        ReservationValueProcessor.FilterStrategy strategy = new ContinuousRandomFilterStrategy();
         assertTrue(strategy.pass(areaStatus, req));
     }
 
@@ -49,7 +49,7 @@ class ContinuousRandomFilterStrategyTest {
                 "userId", "event", "A", 3, 3, ReservationTypeEnum.RANDOM, new ArrayList<>()
         );
 
-        ReservationTransformer.FilterStrategy strategy = new ContinuousRandomFilterStrategy();
+        ReservationValueProcessor.FilterStrategy strategy = new ContinuousRandomFilterStrategy();
         assertTrue(strategy.pass(areaStatus, req));
     }
 
@@ -68,7 +68,7 @@ class ContinuousRandomFilterStrategyTest {
                 "userId", "event", "A", 1, 1, ReservationTypeEnum.RANDOM, new ArrayList<>()
         );
 
-        ReservationTransformer.FilterStrategy strategy = new ContinuousRandomFilterStrategy();
+        ReservationValueProcessor.FilterStrategy strategy = new ContinuousRandomFilterStrategy();
         assertFalse(strategy.pass(areaStatus, req));
     }
 
@@ -87,7 +87,7 @@ class ContinuousRandomFilterStrategyTest {
                 "userId", "event", "A", 4, 4, ReservationTypeEnum.RANDOM, new ArrayList<>()
         );
 
-        ReservationTransformer.FilterStrategy strategy = new ContinuousRandomFilterStrategy();
+        ReservationValueProcessor.FilterStrategy strategy = new ContinuousRandomFilterStrategy();
         assertFalse(strategy.pass(areaStatus, req));
     }
 }
