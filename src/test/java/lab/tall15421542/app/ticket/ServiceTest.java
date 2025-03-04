@@ -183,8 +183,10 @@ class ServiceTest {
                 userId, eventId, areaId, numOfSeat, seats, type
         );
 
-        Invocation.Builder request = client.target(String.format("http://localhost:%d/v1/event/%s/reservation", port1, eventId)).request(MediaType.APPLICATION_JSON);
-        Future<Response> responseFuture = request.async().post(Entity.json(req));
+        Invocation.Builder request = client.target(String.format("http://localhost:%d/v1/event/%s/reservation", port1, eventId)).request(MediaType.TEXT_PLAIN);
+        Response response = request.post(Entity.json(req));
+        assertEquals(200, response.getStatus());
+        String requestId = response.readEntity(String.class);
 
         List<ConsumerRecord<String, CreateReservation>> actual = new CopyOnWriteArrayList<>();
         ExecutorService executorService = Executors.newSingleThreadExecutor();
@@ -207,7 +209,6 @@ class ServiceTest {
             executorService.awaitTermination(200, MILLISECONDS);
         }
 
-        String requestId = new String(actual.get(0).headers().lastHeader("request-id").value());
         String reservationId = "reservationId";
         List<Seat> reservedSeats = List.of(new Seat(0,0), new Seat(0,1));
         Reservation reservation = new Reservation(
@@ -221,10 +222,9 @@ class ServiceTest {
         reservationStatusUpdated.headers().add("request-id", requestId.getBytes(StandardCharsets.UTF_8));
         reservationKafkaProducer.send(reservationStatusUpdated);
 
-        Response response = responseFuture.get();
-        assertEquals(200, response.getStatus());
-
-        ReservationBean reservationBean = response.readEntity(ReservationBean.class);
+        Invocation.Builder request1 = client.target(String.format("http://localhost:%d/v1/reservation/%s", port1, requestId)).request(MediaType.APPLICATION_JSON);
+        Response response1 = request1.get();
+        ReservationBean reservationBean = response1.readEntity(ReservationBean.class);
         assertEquals(ReservationBean.fromAvro(reservation), reservationBean);
 
         Invocation.Builder request2 = client.target(String.format("http://localhost:%d/v1/reservation/%s", port2, requestId)).request(MediaType.APPLICATION_JSON);
