@@ -60,6 +60,9 @@ import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 
+import io.opentelemetry.instrumentation.annotations.SpanAttribute;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
+
 @Path("v1")
 public class Service {
     Producer<String, CreateEvent> createEventProducer;
@@ -139,6 +142,7 @@ public class Service {
         props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
         props.put(StreamsConfig.APPLICATION_SERVER_CONFIG, this.hostname + ":" + this.port);
+        props.put(StreamsConfig.ROCKSDB_CONFIG_SETTER_CLASS_CONFIG, RocksDBConfig.class);
         props.put(StreamsConfig.METRICS_RECORDING_LEVEL_CONFIG, "DEBUG");
 
         KafkaStreams streams = new KafkaStreams(topology, props);
@@ -260,10 +264,16 @@ public class Service {
         }
     }
 
-    private void fetchReservationFromLocal(String reservationId, AsyncResponse asyncResponse){
-        final Reservation reservation = reservationStore().get(reservationId);
+    @WithSpan
+    private void fetchReservationFromLocal(@SpanAttribute("reservation_id") String reservationId, AsyncResponse asyncResponse){
+        Reservation reservation = reservationStore().get(reservationId);
         if(reservation == null){
             outstandingRequests.put(reservationId, asyncResponse);
+            reservation = reservationStore().get(reservationId);
+            if(reservation != null){
+                outstandingRequests.remove(reservationId);
+                asyncResponse.resume(ReservationBean.fromAvro(reservation));
+            }
         }else{
             asyncResponse.resume(ReservationBean.fromAvro(reservation));
         }
@@ -282,7 +292,8 @@ public class Service {
         }
     }
 
-    private HostInfo getKeyLocationOrBlock(final String id, final AsyncResponse asyncResponse) {
+    @WithSpan
+    private HostInfo getKeyLocationOrBlock(@SpanAttribute("reservation_id") final String id, final AsyncResponse asyncResponse) {
         HostInfo locationOfKey = null;
         while (locationOfKey == null) {
             try {
@@ -293,6 +304,7 @@ public class Service {
 
                 if(metadata != KeyQueryMetadata.NOT_AVAILABLE){
                     locationOfKey = metadata.activeHost();
+                    break;
                 }
             } catch (final NotFoundException swallow) {
                 // swallow
