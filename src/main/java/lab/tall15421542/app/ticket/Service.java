@@ -1,5 +1,6 @@
 package lab.tall15421542.app.ticket;
 
+import jakarta.ws.rs.core.Application;
 import jakarta.ws.rs.core.GenericType;
 import jakarta.ws.rs.core.Response;
 import lab.tall15421542.app.avro.reservation.*;
@@ -64,7 +65,7 @@ import io.opentelemetry.instrumentation.annotations.SpanAttribute;
 import io.opentelemetry.instrumentation.annotations.WithSpan;
 
 @Path("v1")
-public class Service {
+public class Service extends Application {
     Producer<String, CreateEvent> createEventProducer;
     Producer<String, CreateReservation> createReservationProducer;
     private String hostname;
