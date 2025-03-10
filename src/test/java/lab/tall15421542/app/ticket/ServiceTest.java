@@ -89,12 +89,12 @@ class ServiceTest {
         Schemas.configureSerdes(props);
 
         Properties props1 = new Properties(props);
-        props1.setProperty(StreamsConfig.STATE_DIR_CONFIG, "/tmp/1");
+        props1.setProperty(StreamsConfig.STATE_DIR_CONFIG, "./tmp/1");
         service1 = new Service("localhost", port1);
         service1.start(bootstrapServers, props1);
 
         Properties props2 = new Properties(props);
-        props2.setProperty(StreamsConfig.STATE_DIR_CONFIG, "/tmp/2");
+        props2.setProperty(StreamsConfig.STATE_DIR_CONFIG, "./tmp/2");
         service2 = new Service("localhost", port2);
         service2.start(bootstrapServers,props2);
 
