@@ -10,6 +10,8 @@ import lab.tall15421542.app.domain.Schemas;
 import lab.tall15421542.app.avro.event.CreateEvent;
 
 import lab.tall15421542.app.domain.beans.ReservationBean;
+import lab.tall15421542.app.utils.RocksDBConfig;
+import lab.tall15421542.app.utils.Utils;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.*;
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -43,17 +45,15 @@ import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
 
-import static io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG;
-
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.lang.System;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.DefaultParser;
@@ -81,17 +81,16 @@ public class Service extends Application {
 
     public static void main(final String[] args) throws Exception {
         final Options opts = new Options();
-        opts.addOption(Option.builder("b")
-                        .longOpt("bootstrap-servers").hasArg().desc("Kafka cluster bootstrap server string").build())
-                .addOption(Option.builder("s")
-                        .longOpt("schema-registry").hasArg().desc("Schema Registry URL").build())
-                .addOption(Option.builder("h")
+        opts.addOption(Option.builder("h")
                         .longOpt("hostname").hasArg().desc("This services HTTP host name").build())
                 .addOption(Option.builder("p")
                         .longOpt("port").hasArg().desc("This services HTTP port").build())
                 .addOption(Option.builder("d")
                         .longOpt("state-dir").hasArg().desc("The directory for state storage").build())
-                .addOption(Option.builder("h").longOpt("help").hasArg(false).desc("Show usage information").build());
+                .addOption(Option.builder("c")
+                        .longOpt("config").hasArg().desc("Config file path").required().build())
+                .addOption(Option.builder("h")
+                        .longOpt("help").hasArg(false).desc("Show usage information").build());
 
         final CommandLine cl = new DefaultParser().parse(opts, args);
         if (cl.hasOption("h")) {
@@ -100,29 +99,26 @@ public class Service extends Application {
             return;
         }
 
-        final String bootstrapServers = cl.getOptionValue("bootstrap-servers", "localhost:29092,localhost:39092,localhost:49092");
         final String restHostname = cl.getOptionValue("hostname", "localhost");
         final int restPort = Integer.parseInt(cl.getOptionValue("port", "4403"));
         final String stateDir = cl.getOptionValue("state-dir", "/tmp/kafka-streams");
-        final String schemaRegistryUrl = cl.getOptionValue("schema-registry", "http://localhost:8081");
+        final String configFile = cl.getOptionValue("config");
 
-        Properties config = new Properties();
-        config.put(SCHEMA_REGISTRY_URL_CONFIG, schemaRegistryUrl);
+        Properties config = Utils.readConfig(configFile);
         Schemas.configureSerdes(config);
 
         final Service service = new Service(restHostname, restPort);
-
-        config.put(StreamsConfig.STATE_DIR_CONFIG, stateDir);
-        service.start(bootstrapServers, config);
+        config.setProperty(StreamsConfig.STATE_DIR_CONFIG, stateDir);
+        service.start(config);
 
         new BufferedReader(new InputStreamReader(System.in)).readLine();
         service.close();
     }
 
-    public void start(String bootstrapServers, Properties config){
-        createEventProducer = startProducer(bootstrapServers, Schemas.Topics.COMMAND_EVENT_CREATE_EVENT, config);
-        createReservationProducer = startProducer(bootstrapServers, Schemas.Topics.COMMAND_RESERVATION_CREATE_RESERVATION, config);
-        this.streams = startKafkaStream(bootstrapServers, config);
+    public void start(Properties config){
+        createEventProducer = startProducer(Schemas.Topics.COMMAND_EVENT_CREATE_EVENT, config);
+        createReservationProducer = startProducer(Schemas.Topics.COMMAND_RESERVATION_CREATE_RESERVATION, config);
+        this.streams = startKafkaStream(config);
 
         startJetty(this.port, this);
     }
@@ -133,18 +129,29 @@ public class Service extends Application {
         this.streams.close();
     }
 
-    private KafkaStreams startKafkaStream(String bootstrapServers, Properties config){
+    public static <T> KafkaProducer startProducer(final Schemas.Topic<String, T> topic, final Properties defaultConfig) {
+        final Properties producerConfig = new Properties();
+        producerConfig.putAll(defaultConfig);
+        producerConfig.setProperty(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, "true");
+        producerConfig.setProperty(ProducerConfig.RETRIES_CONFIG, String.valueOf(Integer.MAX_VALUE));
+        producerConfig.setProperty(ProducerConfig.ACKS_CONFIG, "all");
+
+        return new KafkaProducer<>(producerConfig,
+                topic.keySerde().serializer(),
+                topic.valueSerde().serializer());
+    }
+
+    private KafkaStreams startKafkaStream(Properties config){
         final Topology topology = createTopology();
         System.out.println(topology.describe());
 
         Properties props = new Properties();
         props.putAll(config);
-        props.put(StreamsConfig.APPLICATION_ID_CONFIG, "ticket-service");
-        props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
-        props.put(StreamsConfig.APPLICATION_SERVER_CONFIG, this.hostname + ":" + this.port);
+        props.setProperty(StreamsConfig.APPLICATION_ID_CONFIG, "ticket-service");
+        props.setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        props.setProperty(StreamsConfig.APPLICATION_SERVER_CONFIG, this.hostname + ":" + this.port);
         props.put(StreamsConfig.ROCKSDB_CONFIG_SETTER_CLASS_CONFIG, RocksDBConfig.class);
-        props.put(StreamsConfig.METRICS_RECORDING_LEVEL_CONFIG, "DEBUG");
+        props.setProperty(StreamsConfig.METRICS_RECORDING_LEVEL_CONFIG, "DEBUG");
 
         KafkaStreams streams = new KafkaStreams(topology, props);
 
@@ -355,20 +362,5 @@ public class Service extends Application {
         }
 
         return jettyServer;
-    }
-
-    public static <T> KafkaProducer startProducer(final String bootstrapServers,
-                                                  final Schemas.Topic<String, T> topic,
-                                                  final Properties defaultConfig) {
-        final Properties producerConfig = new Properties();
-        producerConfig.putAll(defaultConfig);
-        producerConfig.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        producerConfig.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, "true");
-        producerConfig.put(ProducerConfig.RETRIES_CONFIG, String.valueOf(Integer.MAX_VALUE));
-        producerConfig.put(ProducerConfig.ACKS_CONFIG, "all");
-
-        return new KafkaProducer<>(producerConfig,
-                topic.keySerde().serializer(),
-                topic.valueSerde().serializer());
     }
 }

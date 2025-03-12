@@ -67,7 +67,7 @@ class ServiceTest {
     static void setup() throws ExecutionException, InterruptedException, IOException {
         String bootstrapServers = kafka.getBootstrapServers();
         Properties props = new Properties();
-        props.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        props.setProperty(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
 
         try (Admin admin = Admin.create(props)) {
             int createEventTopicPartitions = 12;
@@ -85,26 +85,31 @@ class ServiceTest {
             future.get();
         }
 
-        props.put(SCHEMA_REGISTRY_URL_CONFIG, "mock://localhost:8081");
+        props.setProperty(SCHEMA_REGISTRY_URL_CONFIG, "mock://localhost:8081");
         Schemas.configureSerdes(props);
 
-        Properties props1 = new Properties(props);
+        props.setProperty(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+
+        Properties props1 = new Properties();
+        props1.putAll(props);
         props1.setProperty(StreamsConfig.STATE_DIR_CONFIG, "./tmp/1");
         service1 = new Service("localhost", port1);
-        service1.start(bootstrapServers, props1);
+        service1.start(props1);
 
-        Properties props2 = new Properties(props);
+        Properties props2 = new Properties();
+        props2.putAll(props);
         props2.setProperty(StreamsConfig.STATE_DIR_CONFIG, "./tmp/2");
         service2 = new Service("localhost", port2);
-        service2.start(bootstrapServers,props2);
+        service2.start(props2);
 
-        Properties consumerProperties = new Properties(props);
+        Properties consumerProperties = new Properties();
+        consumerProperties.putAll(props);
         consumerProperties.setProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         consumerProperties.setProperty("enable.auto.commit", "false");
         consumerProperties.setProperty("auto.commit.interval.ms", "1000");
         consumerProperties.setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-
         consumerProperties.setProperty("group.id", "test-create-event");
+
         createEventKafkaConsumer = new KafkaConsumer<String, CreateEvent>(
                 consumerProperties,
                 Schemas.Topics.COMMAND_EVENT_CREATE_EVENT.keySerde().deserializer(),
