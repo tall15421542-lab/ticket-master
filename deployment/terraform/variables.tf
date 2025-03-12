@@ -12,5 +12,5 @@ variable "confluent_cloud_api_secret" {
 variable "partitions_count" {
   description = "Topic partition count"
   type        = number
-  default     = 100
+  default     = 20
 }

@@ -141,9 +141,9 @@ public class Service {
         Topology topology = createTopology();
         System.out.println(topology.describe());
 
-        config.put(StreamsConfig.APPLICATION_ID_CONFIG, "event-service");
-        config.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-        config.put(StreamsConfig.STATE_DIR_CONFIG, stateDir);
+        config.setProperty(StreamsConfig.APPLICATION_ID_CONFIG, "event-service");
+        config.setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        config.setProperty(StreamsConfig.STATE_DIR_CONFIG, stateDir);
 
         KafkaStreams streams = new KafkaStreams(topology, config);
         streams.start();
