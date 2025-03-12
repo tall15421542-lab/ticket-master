@@ -1,5 +1,6 @@
 package lab.tall15421542.app.event;
 
+import lab.tall15421542.app.utils.Utils;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.kstream.*;
@@ -16,9 +17,10 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 
 import static io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG;
 
-import java.io.InputStreamReader;
-import java.io.BufferedReader;
+import java.io.*;
 
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.LinkedList;
 import java.util.ArrayList;
 import java.util.List;
@@ -123,7 +125,10 @@ public class Service {
         final Options opts = new Options();
         opts.addOption(Option.builder("d")
                         .longOpt("state-dir").hasArg().desc("The directory for state storage").build())
-                .addOption(Option.builder("h").longOpt("help").hasArg(false).desc("Show usage information").build());
+                .addOption(Option.builder("c")
+                        .longOpt("config").hasArg().desc("Config file path").build())
+                .addOption(Option.builder("h")
+                        .longOpt("help").hasArg(false).desc("Show usage information").build());
 
         final CommandLine cl = new DefaultParser().parse(opts, args);
         if (cl.hasOption("h")) {
@@ -133,42 +138,22 @@ public class Service {
         }
 
         final String stateDir = cl.getOptionValue("state-dir", "/tmp/kafka-streams");
+        final String configFile = cl.getOptionValue("config", "../client.dev.properties");
 
-        Properties config = new Properties();
-        config.put(SCHEMA_REGISTRY_URL_CONFIG, "http://localhost:8081");
+        Properties config = Utils.readConfig(configFile);
         Schemas.configureSerdes(config);
 
         Topology topology = createTopology();
         System.out.println(topology.describe());
 
-        Properties props = new Properties();
-        props.put(StreamsConfig.APPLICATION_ID_CONFIG, "event-service");
-        props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:29092");
-        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-        props.put(StreamsConfig.DEFAULT_DESERIALIZATION_EXCEPTION_HANDLER_CLASS_CONFIG,
-                MyDeserializationExceptionHandler.class.getName());
-        props.put(StreamsConfig.STATE_DIR_CONFIG, stateDir);
+        config.put(StreamsConfig.APPLICATION_ID_CONFIG, "event-service");
+        config.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        config.put(StreamsConfig.STATE_DIR_CONFIG, stateDir);
 
-        KafkaStreams streams = new KafkaStreams(topology, props);
+        KafkaStreams streams = new KafkaStreams(topology, config);
         streams.start();
 
         new BufferedReader(new InputStreamReader(System.in)).readLine();
         streams.close();
     }
-
-    public static class MyDeserializationExceptionHandler implements DeserializationExceptionHandler {
-        @Override
-        public DeserializationHandlerResponse handle(ProcessorContext context,  ConsumerRecord<byte[],byte[]> record, Exception e) {
-            // Log the error and continue processing
-            System.err.println("Error deserializing record: " + e.getMessage());
-            return DeserializationHandlerResponse.CONTINUE;  // Continue processing other records
-        }
-
-        @Override
-        public void configure(Map<String, ?> configs) {
-            // You can access configuration properties here if needed
-            System.out.println("Configuring MyDeserializationExceptionHandler with configs: " + configs);
-        }
-    }
-
 }

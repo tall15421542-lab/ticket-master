@@ -1,4 +1,4 @@
-package lab.tall15421542.app.ticket;
+package lab.tall15421542.app.utils;
 
 import org.apache.kafka.streams.state.RocksDBConfigSetter;
 import org.rocksdb.Options;
