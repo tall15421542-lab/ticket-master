@@ -24,9 +24,12 @@ import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.QueryableStoreTypes;
 import org.apache.kafka.streams.state.ReadOnlyKeyValueStore;
 import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.servlet.ServletContextHandler;
-import org.eclipse.jetty.servlet.ServletHolder;
+import org.eclipse.jetty.server.ServerConnector;
+import org.eclipse.jetty.ee10.servlet.ServletContextHandler;
+import org.eclipse.jetty.ee10.servlet.ServletHolder;
 
+import org.eclipse.jetty.util.thread.QueuedThreadPool;
+import org.eclipse.jetty.util.thread.VirtualThreadPool;
 import org.glassfish.jersey.servlet.ServletContainer;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.server.ManagedAsync;
@@ -52,6 +55,7 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.lang.System;
 
@@ -70,13 +74,15 @@ public class Service extends Application {
     Producer<String, CreateReservation> createReservationProducer;
     private String hostname;
     private int port;
+    private int maxVirtualThreads;
     KafkaStreams streams;
     final Map<String, AsyncResponse> outstandingRequests = new ConcurrentHashMap<>();
     final Client client = ClientBuilder.newBuilder().register(JacksonFeature.class).build();
 
-    public Service(String hostname, int port){
+    public Service(String hostname, int port, int maxVirtualThreads){
         this.hostname = hostname;
         this.port = port;
+        this.maxVirtualThreads = maxVirtualThreads;
     }
 
     public static void main(final String[] args) throws Exception {
@@ -89,6 +95,8 @@ public class Service extends Application {
                         .longOpt("state-dir").hasArg().desc("The directory for state storage").build())
                 .addOption(Option.builder("c")
                         .longOpt("config").hasArg().desc("Config file path").required().build())
+                .addOption(Option.builder("n")
+                        .longOpt("max-virtual-threads").hasArg().desc("Config file path").build())
                 .addOption(Option.builder("h")
                         .longOpt("help").hasArg(false).desc("Show usage information").build());
 
@@ -103,11 +111,12 @@ public class Service extends Application {
         final int restPort = Integer.parseInt(cl.getOptionValue("port", "4403"));
         final String stateDir = cl.getOptionValue("state-dir", "/tmp/kafka-streams");
         final String configFile = cl.getOptionValue("config");
+        final int maxVirtualThreads = Integer.parseInt(cl.getOptionValue("max-virtual-threads", "5000"));
 
         Properties config = Utils.readConfig(configFile);
         Schemas.configureSerdes(config);
 
-        final Service service = new Service(restHostname, restPort);
+        final Service service = new Service(restHostname, restPort, maxVirtualThreads);
         config.setProperty(StreamsConfig.STATE_DIR_CONFIG, stateDir);
         service.start(config);
 
@@ -120,7 +129,7 @@ public class Service extends Application {
         createReservationProducer = startProducer(Schemas.Topics.COMMAND_RESERVATION_CREATE_RESERVATION, config);
         this.streams = startKafkaStream(config);
 
-        startJetty(this.port, this);
+        startJetty(this.port, this.maxVirtualThreads, this);
     }
 
     public void close(){
@@ -340,12 +349,21 @@ public class Service extends Application {
                         QueryableStoreTypes.keyValueStore()));
     }
 
-    public static Server startJetty(final int port, final Object binding) {
+    public static Server startJetty(final int port, final int maxVirtualThreads, final Object binding) {
         final ServletContextHandler context = new ServletContextHandler(ServletContextHandler.SESSIONS);
         context.setContextPath("/");
 
-        final Server jettyServer = new Server(port);
+        QueuedThreadPool threadPool = new QueuedThreadPool();
+        VirtualThreadPool virtualExecutor = new VirtualThreadPool();
+        virtualExecutor.setMaxThreads(maxVirtualThreads);
+        threadPool.setVirtualThreadsExecutor(virtualExecutor);
+
+        final Server jettyServer = new Server(threadPool);
         jettyServer.setHandler(context);
+
+        ServerConnector connector = new ServerConnector(jettyServer);
+        connector.setPort(port);
+        jettyServer.addConnector(connector);
 
         final ResourceConfig rc = new ResourceConfig();
         rc.register(binding);

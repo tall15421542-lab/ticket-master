@@ -90,16 +90,17 @@ class ServiceTest {
 
         props.setProperty(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
 
+        final int maxVirtualThreads = 128;
         Properties props1 = new Properties();
         props1.putAll(props);
         props1.setProperty(StreamsConfig.STATE_DIR_CONFIG, "./tmp/1");
-        service1 = new Service("localhost", port1);
+        service1 = new Service("localhost", port1, maxVirtualThreads);
         service1.start(props1);
 
         Properties props2 = new Properties();
         props2.putAll(props);
         props2.setProperty(StreamsConfig.STATE_DIR_CONFIG, "./tmp/2");
-        service2 = new Service("localhost", port2);
+        service2 = new Service("localhost", port2, maxVirtualThreads);
         service2.start(props2);
 
         Properties consumerProperties = new Properties();
