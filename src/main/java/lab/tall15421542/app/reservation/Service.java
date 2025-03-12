@@ -8,6 +8,7 @@ import lab.tall15421542.app.avro.reservation.ReservationResult;
 import lab.tall15421542.app.avro.reservation.Reservation;
 import lab.tall15421542.app.avro.reservation.CreateReservation;
 import lab.tall15421542.app.avro.reservation.StateEnum;
+import lab.tall15421542.app.utils.Utils;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.kafka.streams.kstream.*;
 import org.slf4j.Logger;
@@ -24,8 +25,9 @@ import org.apache.kafka.streams.KeyValue;
 
 import static io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
+import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.Map;
 import java.util.Properties;
 
@@ -43,7 +45,10 @@ public class Service {
         final Options opts = new Options();
         opts.addOption(Option.builder("d")
                         .longOpt("state-dir").hasArg().desc("The directory for state storage").build())
-                .addOption(Option.builder("h").longOpt("help").hasArg(false).desc("Show usage information").build());
+                .addOption(Option.builder("c")
+                        .longOpt("config").hasArg().desc("Config file path").required().build())
+                .addOption(Option.builder("h")
+                        .longOpt("help").hasArg(false).desc("Show usage information").build());
 
         final CommandLine cl = new DefaultParser().parse(opts, args);
         if (cl.hasOption("h")) {
@@ -53,22 +58,20 @@ public class Service {
         }
 
         final String stateDir = cl.getOptionValue("state-dir", "/tmp/kafka-streams");
+        final String configFile = cl.getOptionValue("config");
 
-        Properties config = new Properties();
-        config.put(SCHEMA_REGISTRY_URL_CONFIG, "http://localhost:8081");
+        Properties config = Utils.readConfig(configFile);
         Schemas.configureSerdes(config);
 
         final Topology topology = createTopology();
         System.out.println(topology.describe());
 
-        Properties props = new Properties();
-        props.put(StreamsConfig.APPLICATION_ID_CONFIG, "reservation-service");
-        props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:29092");
-        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-        props.put(StreamsConfig.STATE_DIR_CONFIG, stateDir);
-        props.put(StreamsConfig.METRICS_RECORDING_LEVEL_CONFIG, "DEBUG");
+        config.setProperty(StreamsConfig.APPLICATION_ID_CONFIG, "reservation-service");
+        config.setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        config.setProperty(StreamsConfig.STATE_DIR_CONFIG, stateDir);
+        config.setProperty(StreamsConfig.METRICS_RECORDING_LEVEL_CONFIG, "DEBUG");
 
-        KafkaStreams streams = new KafkaStreams(topology, props);
+        KafkaStreams streams = new KafkaStreams(topology, config);
         streams.start();
 
         new BufferedReader(new InputStreamReader(System.in)).readLine();
