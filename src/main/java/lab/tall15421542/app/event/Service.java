@@ -86,12 +86,7 @@ public class Service {
                 }
         );
 
-        KStream<String, AreaStatus> repartitionedCreateEventAreas = createEventAreas.repartition(
-                Repartitioned.<String,AreaStatus>numberOfPartitions(10)
-                        .withKeySerde(Schemas.Stores.AREA_STATUS.keySerde())
-                        .withValueSerde(Schemas.Stores.AREA_STATUS.valueSerde()));
-
-        KTable<String, AreaStatus> areaStatus = repartitionedCreateEventAreas.toTable(
+        KTable<String, AreaStatus> areaStatus = createEventAreas.toTable(
                 Materialized.<String, AreaStatus, KeyValueStore<Bytes, byte[]>>as(Schemas.Stores.AREA_STATUS.name())
                         .withKeySerde(Schemas.Stores.AREA_STATUS.keySerde())
                         .withValueSerde(Schemas.Stores.AREA_STATUS.valueSerde())
