@@ -52,6 +52,11 @@
       <artifactId>jetty-ee10-servlet</artifactId>
       <version>12.0.17</version>
     </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty.http2</groupId>
+      <artifactId>jetty-http2-server</artifactId>
+      <version>12.0.17</version>
+    </dependency>
 
     <!-- Jersey Core -->
     <dependency>
