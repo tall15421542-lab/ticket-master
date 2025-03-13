@@ -145,8 +145,11 @@ public class Service extends Application {
         final Properties producerConfig = new Properties();
         producerConfig.putAll(defaultConfig);
         producerConfig.setProperty(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, "true");
-        producerConfig.setProperty(ProducerConfig.RETRIES_CONFIG, String.valueOf(Integer.MAX_VALUE));
         producerConfig.setProperty(ProducerConfig.ACKS_CONFIG, "all");
+        producerConfig.setProperty(ProducerConfig.LINGER_MS_CONFIG,
+                defaultConfig.getProperty(ProducerConfig.LINGER_MS_CONFIG, "20"));
+        producerConfig.setProperty(ProducerConfig.COMPRESSION_TYPE_CONFIG,
+                defaultConfig.getProperty(ProducerConfig.COMPRESSION_TYPE_CONFIG, "none"));
 
         return new KafkaProducer<>(producerConfig,
                 topic.keySerde().serializer(),
