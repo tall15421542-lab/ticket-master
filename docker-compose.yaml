@@ -95,3 +95,24 @@ services:
         bootstrap.servers=kafka-1:19092,kafka-2:19092,kafka-3:19092
         schema.registry.url=http://schema-registry:8081
       SERVER_PORT: 9000
+
+  jaeger:
+      image: jaegertracing/jaeger:2.3.0
+      volumes:
+        - "./otel/jaeger/config.yaml:/etc/jaeger/config.yml"
+      command: ["--config", "/etc/jaeger/config.yml"]
+      ports:
+        - "16686:16686"
+        - "14269:14269"
+        - "8888:8888"
+        - "8889:8889"
+        - "4317:4317"
+        - "4318:4318"
+  prometheus:
+    image: prom/prometheus:v3.2.0
+    volumes:
+      - "./otel/prometheus/config.yml:/etc/prometheus/prometheus.yml"
+    ports:
+      - "9090:9090"
+    links: 
+      - "jaeger:spm_metrics_source" # This is the host name used in Prometheus scrape configuration.
