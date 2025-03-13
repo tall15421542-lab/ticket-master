@@ -23,8 +23,11 @@ import org.apache.kafka.streams.state.HostInfo;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.QueryableStoreTypes;
 import org.apache.kafka.streams.state.ReadOnlyKeyValueStore;
+import org.eclipse.jetty.server.HttpConfiguration;
+import org.eclipse.jetty.server.HttpConnectionFactory;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
+import org.eclipse.jetty.http2.server.HTTP2CServerConnectionFactory;
 import org.eclipse.jetty.ee10.servlet.ServletContextHandler;
 import org.eclipse.jetty.ee10.servlet.ServletHolder;
 
@@ -361,7 +364,16 @@ public class Service extends Application {
         final Server jettyServer = new Server(threadPool);
         jettyServer.setHandler(context);
 
-        ServerConnector connector = new ServerConnector(jettyServer);
+        // The HTTP configuration object.
+        HttpConfiguration httpConfig = new HttpConfiguration();
+
+        // The ConnectionFactory for HTTP/1.1.
+        HttpConnectionFactory http11 = new HttpConnectionFactory(httpConfig);
+
+        // The ConnectionFactory for clear-text HTTP/2.
+        HTTP2CServerConnectionFactory h2c = new HTTP2CServerConnectionFactory(httpConfig);
+
+        ServerConnector connector = new ServerConnector(jettyServer, http11, h2c);
         connector.setPort(port);
         jettyServer.addConnector(connector);
 
