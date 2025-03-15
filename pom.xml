@@ -14,6 +14,16 @@
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.release>23</maven.compiler.release>
+
+    <!-- dependencies version -->
+    <avro.version>1.12.0</avro.version>
+    <jackson.version>2.16.0</jackson.version>
+    <jersey.version>3.1.9</jersey.version>
+    <jetty.version>12.0.17</jetty.version>
+    <kafka.version>3.9.0</kafka.version>
+    <slf4j.version>2.0.16</slf4j.version>
+    <testcontainers.version>1.20.4</testcontainers.version>
+    <confluent.version>7.7.1</confluent.version>
   </properties>
 
   <repositories>
@@ -35,7 +45,7 @@
       <dependency>
         <groupId>com.fasterxml.jackson.core</groupId>
         <artifactId>jackson-databind</artifactId>
-        <version>2.16.0</version>
+        <version>${jackson.version}</version>
         <scope>runtime</scope>
       </dependency>
     </dependencies>
@@ -46,58 +56,58 @@
     <dependency>
       <groupId>org.eclipse.jetty</groupId>
       <artifactId>jetty-server</artifactId>
-      <version>12.0.17</version>
+      <version>${jetty.version}</version>
     </dependency>
     <dependency>
       <groupId>org.eclipse.jetty.ee10</groupId>
       <artifactId>jetty-ee10-servlet</artifactId>
-      <version>12.0.17</version>
+      <version>${jetty.version}</version>
     </dependency>
     <dependency>
       <groupId>org.eclipse.jetty.http2</groupId>
       <artifactId>jetty-http2-server</artifactId>
-      <version>12.0.17</version>
+      <version>${jetty.version}</version>
     </dependency>
     <dependency>
       <groupId>org.eclipse.jetty</groupId>
       <artifactId>jetty-util</artifactId>
-      <version>12.0.17</version>
+      <version>${jetty.version}</version>
     </dependency>
 
     <!-- Jersey Dependencies -->
     <dependency>
       <groupId>org.glassfish.jersey.core</groupId>
       <artifactId>jersey-server</artifactId>
-      <version>3.1.9</version>
+      <version>${jersey.version}</version>
     </dependency>
     <dependency>
       <groupId>org.glassfish.jersey.containers</groupId>
       <artifactId>jersey-container-servlet</artifactId>
-      <version>3.1.9</version>
+      <version>${jersey.version}</version>
       <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.glassfish.jersey.inject</groupId>
       <artifactId>jersey-hk2</artifactId>
-      <version>3.1.9</version>
+      <version>${jersey.version}</version>
       <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.glassfish.jersey.media</groupId>
       <artifactId>jersey-media-json-jackson</artifactId>
-      <version>3.1.9</version>
+      <version>${jersey.version}</version>
     </dependency>
     <dependency>
       <groupId>org.glassfish.jersey.containers</groupId>
       <artifactId>jersey-container-servlet-core</artifactId>
-      <version>3.1.9</version>
+      <version>${jersey.version}</version>
     </dependency>
 
     <!-- Jackson Dependencies -->
     <dependency>
       <groupId>com.fasterxml.jackson.datatype</groupId>
       <artifactId>jackson-datatype-jsr310</artifactId>
-      <version>2.16.0</version>
+      <version>${jackson.version}</version>
       <scope>runtime</scope>
     </dependency>
 
@@ -117,31 +127,31 @@
     <dependency>
       <groupId>org.apache.avro</groupId>
       <artifactId>avro</artifactId>
-      <version>1.12.0</version>
+      <version>${avro.version}</version>
     </dependency>
 
     <!-- Confluent Dependencies -->
     <dependency>
       <groupId>io.confluent</groupId>
       <artifactId>kafka-streams-avro-serde</artifactId>
-      <version>7.7.1</version>
+      <version>${confluent.version}</version>
     </dependency>
     <dependency>
       <groupId>io.confluent</groupId>
       <artifactId>kafka-schema-serializer</artifactId>
-      <version>7.7.1</version>
+      <version>${confluent.version}</version>
     </dependency>
 
     <!-- Kafka Dependencies -->
     <dependency>
       <groupId>org.apache.kafka</groupId>
       <artifactId>kafka-clients</artifactId>
-      <version>3.9.0</version>
+      <version>${kafka.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.kafka</groupId>
       <artifactId>kafka-streams</artifactId>
-      <version>3.9.0</version>
+      <version>${kafka.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.kafka</groupId>
@@ -161,13 +171,13 @@
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-simple</artifactId>
-      <version>2.0.7</version>
+      <version>${slf4j.version}</version>
       <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
-      <version>2.0.16</version>
+      <version>${slf4j.version}</version>
     </dependency>
 
     <!-- OpenTelemetry Dependencies -->
@@ -193,19 +203,19 @@
     <dependency>
       <groupId>org.testcontainers</groupId>
       <artifactId>testcontainers</artifactId>
-      <version>1.20.4</version>
+      <version>${testcontainers.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.testcontainers</groupId>
       <artifactId>kafka</artifactId>
-      <version>1.20.4</version>
+      <version>${testcontainers.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.testcontainers</groupId>
       <artifactId>junit-jupiter</artifactId>
-      <version>1.20.4</version>
+      <version>${testcontainers.version}</version>
       <scope>test</scope>
     </dependency>
   </dependencies>
@@ -215,7 +225,7 @@
       <plugin>
         <groupId>org.apache.avro</groupId>
         <artifactId>avro-maven-plugin</artifactId>
-        <version>1.12.0</version>
+        <version>${avro.version}</version>
         <executions>
           <execution>
             <phase>generate-sources</phase>
@@ -249,14 +259,12 @@
         </executions>
       </plugin>
     </plugins>
-    <pluginManagement><!-- lock down plugins versions to avoid using Maven defaults (may be moved to parent pom) -->
+    <pluginManagement>
       <plugins>
-        <!-- clean lifecycle, see https://maven.apache.org/ref/current/maven-core/lifecycles.html#clean_Lifecycle -->
         <plugin>
           <artifactId>maven-clean-plugin</artifactId>
           <version>3.4.0</version>
         </plugin>
-        <!-- default lifecycle, jar packaging: see https://maven.apache.org/ref/current/maven-core/default-bindings.html#Plugin_bindings_for_jar_packaging -->
         <plugin>
           <artifactId>maven-resources-plugin</artifactId>
           <version>3.3.1</version>
@@ -264,10 +272,6 @@
         <plugin>
           <artifactId>maven-compiler-plugin</artifactId>
           <version>3.13.0</version>
-          <configuration>
-            <source>23</source>
-            <target>23</target>
-          </configuration>
         </plugin>
         <plugin>
           <artifactId>maven-surefire-plugin</artifactId>
@@ -285,7 +289,6 @@
           <artifactId>maven-deploy-plugin</artifactId>
           <version>3.1.2</version>
         </plugin>
-        <!-- site lifecycle, see https://maven.apache.org/ref/current/maven-core/lifecycles.html#site_Lifecycle -->
         <plugin>
           <artifactId>maven-site-plugin</artifactId>
           <version>3.12.1</version>
