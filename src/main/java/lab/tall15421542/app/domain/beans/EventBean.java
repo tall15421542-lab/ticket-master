@@ -1,9 +1,10 @@
 package lab.tall15421542.app.domain.beans;
 
-import lab.tall15421542.app.avro.event.CreateEvent;
 import lab.tall15421542.app.avro.event.Area;
-import java.util.ArrayList;
+import lab.tall15421542.app.avro.event.CreateEvent;
+
 import java.time.Instant;
+import java.util.ArrayList;
 
 public class EventBean {
     private String eventName;

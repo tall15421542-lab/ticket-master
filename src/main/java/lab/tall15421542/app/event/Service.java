@@ -1,49 +1,25 @@
 package lab.tall15421542.app.event;
 
-import lab.tall15421542.app.utils.Utils;
-import org.apache.kafka.common.utils.Bytes;
-import org.apache.kafka.streams.KafkaStreams;
-import org.apache.kafka.streams.kstream.*;
-import org.apache.kafka.streams.StreamsBuilder;
-import org.apache.kafka.streams.KeyValue;
-import org.apache.kafka.streams.StreamsConfig;
-import org.apache.kafka.streams.Topology;
-import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.streams.state.KeyValueStore;
-import org.apache.kafka.streams.processor.ProcessorContext;
-import org.apache.kafka.streams.errors.DeserializationExceptionHandler;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-
-
-import static io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG;
-
-import java.io.*;
-
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.LinkedList;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Properties;
-import java.util.Map;
-
-import org.apache.commons.cli.CommandLine;
-import org.apache.commons.cli.DefaultParser;
-import org.apache.commons.cli.HelpFormatter;
-import org.apache.commons.cli.Option;
-import org.apache.commons.cli.Options;
-
+import lab.tall15421542.app.avro.event.*;
+import lab.tall15421542.app.avro.reservation.ReservationResult;
 import lab.tall15421542.app.domain.Schemas;
 import lab.tall15421542.app.domain.Schemas.Topics;
-import lab.tall15421542.app.avro.event.CreateEvent;
-import lab.tall15421542.app.avro.event.Area;
-import lab.tall15421542.app.avro.event.AreaStatus;
-import lab.tall15421542.app.avro.event.SeatStatus;
-import lab.tall15421542.app.avro.event.ReserveSeat;
-import lab.tall15421542.app.avro.reservation.ReservationResult;
-
+import lab.tall15421542.app.utils.Utils;
+import org.apache.commons.cli.*;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.common.utils.Bytes;
+import org.apache.kafka.streams.*;
+import org.apache.kafka.streams.kstream.*;
+import org.apache.kafka.streams.state.KeyValueStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Properties;
 
 public class Service {
     private static final Logger log = LoggerFactory.getLogger(Service.class);
