@@ -1,11 +1,11 @@
 package lab.tall15421542.app.domain.beans;
 
 import lab.tall15421542.app.avro.reservation.CreateReservation;
-import lab.tall15421542.app.avro.reservation.Seat;
 import lab.tall15421542.app.avro.reservation.ReservationTypeEnum;
+import lab.tall15421542.app.avro.reservation.Seat;
 
-import java.util.List;
 import java.util.ArrayList;
+import java.util.List;
 
 public class CreateReservationBean {
     private String userId;

@@ -1,23 +1,20 @@
 package lab.tall15421542.app.domain;
 
-import lab.tall15421542.app.avro.event.CreateEvent;
+import io.confluent.kafka.streams.serdes.avro.SpecificAvroSerde;
 import lab.tall15421542.app.avro.event.AreaStatus;
+import lab.tall15421542.app.avro.event.CreateEvent;
 import lab.tall15421542.app.avro.event.ReserveSeat;
 import lab.tall15421542.app.avro.reservation.CreateReservation;
-import lab.tall15421542.app.avro.reservation.ReservationResult;
 import lab.tall15421542.app.avro.reservation.Reservation;
-
-import io.confluent.kafka.streams.serdes.avro.SpecificAvroSerde;
-
-import static io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG;
-
+import lab.tall15421542.app.avro.reservation.ReservationResult;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
 
-import java.lang.String;
-import java.util.Map;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
+
+import static io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG;
 
 public class Schemas{
     public static class Topic<K,V>{

@@ -3,8 +3,8 @@ package lab.tall15421542.app.domain.beans;
 import lab.tall15421542.app.avro.reservation.Reservation;
 import lab.tall15421542.app.avro.reservation.Seat;
 
-import java.util.List;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 public class ReservationBean {
