@@ -67,7 +67,7 @@ services:
 
   # Schema Registry
   schema-registry:
-    image: confluentinc/cp-schema-registry:latest
+    image: confluentinc/cp-schema-registry:7.8.1
     container_name: schema-registry
     depends_on:
       - kafka-1
