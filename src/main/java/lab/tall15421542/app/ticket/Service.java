@@ -368,6 +368,7 @@ public class Service extends Application {
 
         final ResourceConfig rc = new ResourceConfig();
         rc.register(binding);
+        rc.register(ObjectMapperWithTimeModule.class);
         rc.register(JacksonFeature.class);
 
         final ServletContainer sc = new ServletContainer(rc);
