@@ -1,4 +1,12 @@
 services:
+  ticket-service:
+    build: ./
+    ports:
+      - 8080:8080
+    volumes:
+      - "./client.docker.properties:/client.docker.properties"
+    command: ["lab.tall15421542.app.ticket.Service", "-c", "client.docker.properties", "-p", "8080"]
+
   kafka-1:
     image: apache/kafka:3.9.0
     hostname: kafka-1
