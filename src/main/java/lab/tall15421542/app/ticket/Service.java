@@ -48,8 +48,6 @@ import org.glassfish.jersey.server.ManagedAsync;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.servlet.ServletContainer;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
@@ -108,9 +106,6 @@ public class Service extends Application {
         final Service service = new Service(restHostname, restPort, maxVirtualThreads);
         config.setProperty(StreamsConfig.STATE_DIR_CONFIG, stateDir);
         service.start(config);
-
-        new BufferedReader(new InputStreamReader(System.in)).readLine();
-        service.close();
     }
 
     public void start(Properties config){
