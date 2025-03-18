@@ -221,16 +221,20 @@
         <groupId>org.apache.avro</groupId>
         <artifactId>avro-maven-plugin</artifactId>
         <version>${avro.version}</version>
+        <configuration>
+          <sourceDirectory>${project.basedir}/src/main/resources/avro</sourceDirectory>
+          <outputDirectory>${project.basedir}/target/generated-sources</outputDirectory>
+          <imports>
+            <import>${project.basedir}/src/main/resources/avro/reservation/reservationTypeEnum.avsc</import>
+            <import>${project.basedir}/src/main/resources/avro/reservation/seat.avsc</import>
+          </imports>
+        </configuration>
         <executions>
           <execution>
             <phase>generate-sources</phase>
             <goals>
               <goal>schema</goal>
             </goals>
-            <configuration>
-              <sourceDirectory>${project.basedir}/src/main/resources/avro</sourceDirectory>
-              <outputDirectory>${project.basedir}/target/generated-sources</outputDirectory>
-            </configuration>
           </execution>
         </executions>
       </plugin>
