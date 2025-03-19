@@ -22,6 +22,8 @@ import org.slf4j.LoggerFactory;
 import java.util.Map;
 import java.util.Properties;
 
+import static lab.tall15421542.app.utils.Utils.addShutdownHookAndBlock;
+
 public class Service {
     private static final Logger log = LoggerFactory.getLogger(Service.class);
     private static final int MaxLRUEntries = 1000;
@@ -58,6 +60,8 @@ public class Service {
 
         KafkaStreams streams = new KafkaStreams(topology, config);
         streams.start();
+
+        addShutdownHookAndBlock(() -> streams.close());
     }
 
     static Topology createTopology() {
