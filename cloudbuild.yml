@@ -17,4 +17,5 @@ availableSecrets:
   secretManager:
     - versionName: projects/ticket-master-tall15421542/secrets/TC_CLOUD_TOKEN/versions/latest
       env: TC_CLOUD_TOKEN
-
+options:
+  logging: CLOUD_LOGGING_ONLY
