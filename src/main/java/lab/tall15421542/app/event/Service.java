@@ -14,8 +14,6 @@ import org.apache.kafka.streams.state.KeyValueStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
@@ -123,8 +121,5 @@ public class Service {
 
         KafkaStreams streams = new KafkaStreams(topology, config);
         streams.start();
-
-        new BufferedReader(new InputStreamReader(System.in)).readLine();
-        streams.close();
     }
 }
