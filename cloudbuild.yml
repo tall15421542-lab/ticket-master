@@ -1,0 +1,20 @@
+steps:
+  - name: "maven:3.9.9-eclipse-temurin-23-alpine"
+    entrypoint: bash
+    args:
+      - "-c"
+      - |
+        curl -fsSL https://app.testcontainers.cloud/bash | bash
+        cp ~/.testcontainers.properties /root/.testcontainers.properties
+        mvn test
+    secretEnv:
+      - TC_CLOUD_TOKEN
+  - name: 'docker'
+    args: [ 'build', '-t', 'asia-east1-docker.pkg.dev/ticket-master-tall15421542/ticket-master/service', '.' ]
+
+images: [ 'asia-east1-docker.pkg.dev/ticket-master-tall15421542/ticket-master/service' ]
+availableSecrets:
+  secretManager:
+    - versionName: projects/ticket-master-tall15421542/secrets/TC_CLOUD_TOKEN/versions/latest
+      env: TC_CLOUD_TOKEN
+
