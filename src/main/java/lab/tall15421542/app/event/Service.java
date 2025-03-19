@@ -19,6 +19,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
 
+import static lab.tall15421542.app.utils.Utils.addShutdownHookAndBlock;
+
 public class Service {
     private static final Logger log = LoggerFactory.getLogger(Service.class);
 
@@ -121,5 +123,7 @@ public class Service {
 
         KafkaStreams streams = new KafkaStreams(topology, config);
         streams.start();
+
+        addShutdownHookAndBlock(() -> streams.close());
     }
 }

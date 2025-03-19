@@ -22,4 +22,15 @@ public class Utils {
 
         return config;
     }
+
+    public static void addShutdownHookAndBlock(final ShutDownHook hook) throws InterruptedException {
+        Thread.currentThread().setUncaughtExceptionHandler((t, e) -> hook.close());
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            try {
+                hook.close();
+            } catch (final Exception ignored) {
+            }
+        }));
+        Thread.currentThread().join();
+    }
 }

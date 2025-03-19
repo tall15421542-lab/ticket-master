@@ -13,7 +13,10 @@ import lab.tall15421542.app.domain.beans.AreaBean;
 import lab.tall15421542.app.domain.beans.CreateReservationBean;
 import lab.tall15421542.app.domain.beans.EventBean;
 import lab.tall15421542.app.domain.beans.ReservationBean;
-import org.apache.kafka.clients.admin.*;
+import org.apache.kafka.clients.admin.Admin;
+import org.apache.kafka.clients.admin.AdminClientConfig;
+import org.apache.kafka.clients.admin.CreateTopicsResult;
+import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -26,7 +29,6 @@ import org.glassfish.jersey.jackson.JacksonFeature;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.KafkaContainer;
@@ -36,7 +38,6 @@ import org.testcontainers.shaded.org.awaitility.Awaitility;
 import org.testcontainers.utility.DockerImageName;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
@@ -44,7 +45,7 @@ import java.util.concurrent.*;
 import static io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @Testcontainers
 class ServiceTest {
@@ -239,7 +240,7 @@ class ServiceTest {
     }
 
     @AfterAll
-    static void close(){
+    static void close() throws Exception {
         createEventKafkaConsumer.close();
         createReservationKafkaConsumer.close();
         reservationKafkaProducer.close();

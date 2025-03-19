@@ -55,6 +55,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
+import static lab.tall15421542.app.utils.Utils.addShutdownHookAndBlock;
+
 @Path("v1")
 public class Service extends Application {
     Producer<String, CreateEvent> createEventProducer;
@@ -65,6 +67,7 @@ public class Service extends Application {
     KafkaStreams streams;
     final Map<String, AsyncResponse> outstandingRequests = new ConcurrentHashMap<>();
     final Client client = ClientBuilder.newBuilder().register(JacksonFeature.class).build();
+    Server server;
 
     public Service(String hostname, int port, int maxVirtualThreads){
         this.hostname = hostname;
@@ -106,20 +109,30 @@ public class Service extends Application {
         final Service service = new Service(restHostname, restPort, maxVirtualThreads);
         config.setProperty(StreamsConfig.STATE_DIR_CONFIG, stateDir);
         service.start(config);
+
+        addShutdownHookAndBlock(() -> {
+            try {
+                service.close();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
     }
 
     public void start(Properties config){
-        createEventProducer = startProducer(Schemas.Topics.COMMAND_EVENT_CREATE_EVENT, config);
-        createReservationProducer = startProducer(Schemas.Topics.COMMAND_RESERVATION_CREATE_RESERVATION, config);
+        this.createEventProducer = startProducer(Schemas.Topics.COMMAND_EVENT_CREATE_EVENT, config);
+        this.createReservationProducer = startProducer(Schemas.Topics.COMMAND_RESERVATION_CREATE_RESERVATION, config);
         this.streams = startKafkaStream(config);
 
-        startJetty(this.port, this.maxVirtualThreads, this);
+        this.server = startJetty(this.port, this.maxVirtualThreads, this);
     }
 
-    public void close(){
+    public void close() throws Exception {
         createEventProducer.close();
         createReservationProducer.close();
         this.streams.close();
+        this.server.stop();
+        this.server.join();
     }
 
     public static <T> KafkaProducer startProducer(final Schemas.Topic<String, T> topic, final Properties defaultConfig) {
