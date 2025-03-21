@@ -24,11 +24,11 @@ module "confluent_kafka" {
 
 // Authenticated by credential file created by using the gcloud auth application-default login
 provider "google" {
-  project     = "ticket-master-tall15421542"
-  region      = "asia-east1"
+  project = "ticket-master-tall15421542"
+  region  = "asia-east1"
 }
 
 module "kubernetes" {
-    source = "./modules/gke"
+  source = "./modules/gke"
 }
 
