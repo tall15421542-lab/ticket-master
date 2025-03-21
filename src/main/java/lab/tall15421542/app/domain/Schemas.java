@@ -14,7 +14,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
-import static io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG;
+import static io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig.*;
 
 public class Schemas{
     public static class Topic<K,V>{
@@ -142,6 +142,13 @@ public class Schemas{
         final HashMap<String, String> map = new HashMap<>();
         if (config.containsKey(SCHEMA_REGISTRY_URL_CONFIG))
             map.put(SCHEMA_REGISTRY_URL_CONFIG, config.getProperty(SCHEMA_REGISTRY_URL_CONFIG));
+        if (config.containsKey(BASIC_AUTH_CREDENTIALS_SOURCE)){
+            map.put(BASIC_AUTH_CREDENTIALS_SOURCE, config.getProperty(BASIC_AUTH_CREDENTIALS_SOURCE));
+        }
+        if (config.containsKey(USER_INFO_CONFIG)){
+            map.put(USER_INFO_CONFIG, config.getProperty(USER_INFO_CONFIG));
+            map.put(SCHEMA_REGISTRY_USER_INFO_CONFIG, config.getProperty(USER_INFO_CONFIG));
+        }
         return map;
     }
 
