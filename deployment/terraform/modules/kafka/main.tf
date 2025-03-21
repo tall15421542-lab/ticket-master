@@ -164,4 +164,8 @@ data "confluent_schema_registry_cluster" "info" {
   environment {
     id = confluent_environment.development.id
   }
+
+  depends_on = [
+    confluent_kafka_cluster.basic
+  ]
 }
