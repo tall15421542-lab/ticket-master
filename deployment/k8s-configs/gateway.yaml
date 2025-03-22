@@ -21,3 +21,21 @@ spec:
   - backendRefs:
     - name: ticket-service 
       port: 80
+---
+apiVersion: networking.gke.io/v1
+kind: HealthCheckPolicy
+metadata:
+  name: lb-healthcheck
+spec:
+  default:
+    logConfig:
+      enabled: true 
+    config:
+      type: HTTP
+      httpHealthCheck:
+        port: 80 
+        requestPath: /v1/health_check 
+    targetRef:
+      group: "" 
+      kind: Service 
+      name: ticket-service 
