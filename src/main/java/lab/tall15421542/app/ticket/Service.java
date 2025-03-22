@@ -222,6 +222,12 @@ public class Service extends Application {
         }
     }
 
+    @GET
+    @Path("health_check")
+    public Response healthCheck() {
+        return Response.status(Response.Status.OK).build();
+    }
+
     @POST
     @ManagedAsync
     @Path("/event")

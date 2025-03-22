@@ -239,6 +239,17 @@ class ServiceTest {
         assertEquals(ReservationBean.fromAvro(reservation), reservation2);
     }
 
+    @Test
+    void health_check(){
+        Invocation.Builder request1 = client.target(String.format("http://localhost:%d/v1/health_check", port1)).request();
+        Response response1 = request1.get();
+        assertEquals(200, response1.getStatus());
+
+        Invocation.Builder request2 = client.target(String.format("http://localhost:%d/v1/health_check", port2)).request();
+        Response response2 = request2.get();
+        assertEquals(200, response2.getStatus());
+    }
+
     @AfterAll
     static void close() throws Exception {
         createEventKafkaConsumer.close();
