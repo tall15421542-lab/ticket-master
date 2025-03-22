@@ -28,6 +28,11 @@ provider "google" {
   region  = "asia-east1"
 }
 
+provider "google-beta" {
+  project = "ticket-master-tall15421542"
+  region  = "asia-east1"
+}
+
 module "kubernetes" {
   source = "./modules/gke"
 }
