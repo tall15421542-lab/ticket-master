@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: event-service-deployment
+  labels:
+    app: event-service 
+spec:
+  replicas: 1 
+  selector:
+    matchLabels:
+      app: event-service 
+  template:
+    metadata:
+      labels:
+        app: event-service 
+    spec:
+      containers:
+      - name: event-service 
+        image: asia-east1-docker.pkg.dev/ticket-master-tall15421542/ticket-master/service:latest
+        command: ["java", "-Djava.security.manager=allow", "-cp", "app.jar"]
+        args: ["lab.tall15421542.app.event.Service", "-c", "config/client.properties"]
+        volumeMounts:
+          - name: client-properties
+            mountPath: /config
+            readOnly: true
+      volumes:
+        - name: client-properties
+          configMap: 
+            name: client.properties

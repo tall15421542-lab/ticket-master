@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ticket-service 
+spec:
+  ports:
+  - name: http 
+    protocol: TCP
+    port: 80 
+  selector:
+    app: ticket-service 
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ticket-service-deployment
+  labels:
+    app: ticket-service 
+spec:
+  replicas: 1 
+  selector:
+    matchLabels:
+      app: ticket-service 
+  template:
+    metadata:
+      labels:
+        app: ticket-service 
+    spec:
+      containers:
+      - name: ticket-service 
+        image: asia-east1-docker.pkg.dev/ticket-master-tall15421542/ticket-master/service:latest
+        command: ["java", "-Djava.security.manager=allow", "-cp", "app.jar"]
+        args: ["lab.tall15421542.app.ticket.Service", "-c", "config/client.properties", "-p", "8080", "-n", "500"]
+        ports:
+        - containerPort: 8080
+        volumeMounts:
+          - name: client-properties
+            mountPath: /config
+            readOnly: true
+      volumes:
+        - name: client-properties
+          configMap: 
+            name: client.properties

@@ -1,0 +1,9 @@
+resources:
+- ticket-service.yaml
+- reservation-service.yaml
+- event-service.yaml
+- gateway.yaml
+configMapGenerator:
+- name: client.properties
+  files:
+  - appConfig/client.properties 
