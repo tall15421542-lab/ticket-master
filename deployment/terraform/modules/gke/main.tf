@@ -30,4 +30,23 @@ resource "google_compute_subnetwork" "network-for-l7lb" {
   network       = data.google_container_cluster.default.network
 }
 
+data "google_project" "default" {}
+
+resource "google_project_iam_member" "log_writer" {
+  project = "ticket-master-tall15421542"
+  role    = "roles/logging.logWriter"
+  member  = "principal://iam.googleapis.com/projects/${data.google_project.default.number}/locations/global/workloadIdentityPools/${data.google_project.default.project_id}.svc.id.goog/subject/ns/opentelemetry/sa/opentelemetry-collector"
+}
+
+resource "google_project_iam_member" "metric_writer" {
+  project = "ticket-master-tall15421542"
+  role    = "roles/monitoring.metricWriter"
+  member  = "principal://iam.googleapis.com/projects/${data.google_project.default.number}/locations/global/workloadIdentityPools/${data.google_project.default.project_id}.svc.id.goog/subject/ns/opentelemetry/sa/opentelemetry-collector"
+}
+
+resource "google_project_iam_member" "trace_agent" {
+  project = "ticket-master-tall15421542"
+  role    = "roles/cloudtrace.agent"
+  member  = "principal://iam.googleapis.com/projects/${data.google_project.default.number}/locations/global/workloadIdentityPools/${data.google_project.default.project_id}.svc.id.goog/subject/ns/opentelemetry/sa/opentelemetry-collector"
+}
 

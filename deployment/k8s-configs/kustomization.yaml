@@ -1,4 +1,5 @@
 resources:
+- https://github.com/GoogleCloudPlatform/otlp-k8s-ingest.git/k8s/base
 - ticket-service.yaml
 - reservation-service.yaml
 - event-service.yaml
