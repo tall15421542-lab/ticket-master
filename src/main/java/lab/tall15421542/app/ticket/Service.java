@@ -87,8 +87,8 @@ public class Service extends Application {
                         .longOpt("config").hasArg().desc("Config file path").required().build())
                 .addOption(Option.builder("n")
                         .longOpt("max-virtual-threads").hasArg().desc("Config file path").build())
-                .addOption(Option.builder("h")
-                        .longOpt("help").hasArg(false).desc("Show usage information").build());
+                .addOption(Option.builder("help")
+                        .hasArg(false).desc("Show usage information").build());
 
         final CommandLine cl = new DefaultParser().parse(opts, args);
         if (cl.hasOption("h")) {
