@@ -7,6 +7,7 @@ spec:
   - name: http 
     protocol: TCP
     port: 80 
+    targetPort: 8080
   selector:
     app: ticket-service 
 ---
@@ -41,3 +42,21 @@ spec:
         - name: client-properties
           configMap: 
             name: client.properties
+---
+apiVersion: networking.gke.io/v1
+kind: HealthCheckPolicy
+metadata:
+  name: lb-healthcheck
+spec:
+  default:
+    logConfig:
+      enabled: true 
+    config:
+      type: HTTP
+      httpHealthCheck:
+        port: 8080 
+        requestPath: /v1/health_check 
+  targetRef:
+    group: "" 
+    kind: Service 
+    name: ticket-service 

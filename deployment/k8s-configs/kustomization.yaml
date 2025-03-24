@@ -3,6 +3,7 @@ resources:
 - reservation-service.yaml
 - event-service.yaml
 - gateway.yaml
+- internal-gateway.yaml
 configMapGenerator:
 - name: client.properties
   files:
