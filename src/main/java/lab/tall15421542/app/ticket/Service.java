@@ -91,7 +91,7 @@ public class Service extends Application {
                         .hasArg(false).desc("Show usage information").build());
 
         final CommandLine cl = new DefaultParser().parse(opts, args);
-        if (cl.hasOption("h")) {
+        if (cl.hasOption("help")) {
             final HelpFormatter formatter = new HelpFormatter();
             formatter.printHelp("Ticket Service", opts);
             return;
