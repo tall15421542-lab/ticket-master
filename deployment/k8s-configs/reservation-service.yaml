@@ -17,8 +17,17 @@ spec:
       containers:
       - name: reservation-service 
         image: asia-east1-docker.pkg.dev/ticket-master-tall15421542/ticket-master/service:latest
-        command: ["java", "-Djava.security.manager=allow", "-cp", "app.jar"]
+        command: ["java", "-javaagent:/opentelemetry-javaagent.jar","-Djava.security.manager=allow", "-cp", "app.jar"]
         args: ["lab.tall15421542.app.reservation.Service", "-c", "config/client.properties"]
+        env:
+          - name: OTEL_SERVICE_NAME
+            value: "reservation-service"
+          - name: OTEL_COLLECTOR_NAME
+            value: 'opentelemetry-collector'
+          - name: OTEL_COLLECTOR_NAMESPACE
+            value: 'opentelemetry'
+          - name: OTEL_EXPORTER_OTLP_ENDPOINT
+            value: "http://$(OTEL_COLLECTOR_NAME).$(OTEL_COLLECTOR_NAMESPACE).svc.cluster.local:4318"
         volumeMounts:
           - name: client-properties
             mountPath: /config

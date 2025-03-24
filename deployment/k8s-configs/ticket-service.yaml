@@ -18,7 +18,7 @@ metadata:
   labels:
     app: ticket-service 
 spec:
-  replicas: 1 
+  replicas: 3 
   selector:
     matchLabels:
       app: ticket-service 
@@ -30,14 +30,31 @@ spec:
       containers:
       - name: ticket-service 
         image: asia-east1-docker.pkg.dev/ticket-master-tall15421542/ticket-master/service:latest
-        command: ["java", "-Djava.security.manager=allow", "-cp", "app.jar"]
-        args: ["lab.tall15421542.app.ticket.Service", "-c", "config/client.properties", "-p", "8080", "-n", "500"]
+        env:
+          - name: OTEL_SERVICE_NAME
+            value: "ticket-service"
+          - name: OTEL_COLLECTOR_NAME
+            value: 'opentelemetry-collector'
+          - name: OTEL_COLLECTOR_NAMESPACE
+            value: 'opentelemetry'
+          - name: OTEL_EXPORTER_OTLP_ENDPOINT
+            value: "http://$(OTEL_COLLECTOR_NAME).$(OTEL_COLLECTOR_NAMESPACE).svc.cluster.local:4318"   
+          - name: POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+        command: ["java", "-javaagent:/opentelemetry-javaagent.jar","-Djava.security.manager=allow", "-cp", "app.jar"]
+        args: ["lab.tall15421542.app.ticket.Service", "-c", "config/client.properties", "-p", "8080", "-n", "500", "-h", "$(POD_IP)"]
         ports:
-        - containerPort: 8080
+          - containerPort: 8080
         volumeMounts:
           - name: client-properties
             mountPath: /config
             readOnly: true
+        resources:
+          requests:
+            memory: "2G"
+            cpu: "500m"
       volumes:
         - name: client-properties
           configMap: 
