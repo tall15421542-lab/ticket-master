@@ -5,28 +5,43 @@ services:
       - 8080:8080
     volumes:
       - "./client.docker.properties:/client.docker.properties"
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
+      - OTEL_SERVICE_NAME=ticket-service
     command: ["lab.tall15421542.app.ticket.Service", "-c", "client.docker.properties", "-p", "8080", "-n", "500"]
     depends_on:
       init-kafka:
         condition: service_completed_successfully
+      jaeger:
+        condition: service_started
 
   reservation-service:
     build: ./
     volumes:
       - "./client.docker.properties:/client.docker.properties"
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
+      - OTEL_SERVICE_NAME=reservation-service
     command: ["lab.tall15421542.app.reservation.Service", "-c", "client.docker.properties"]
     depends_on:
       init-kafka:
         condition: service_completed_successfully
+      jaeger:
+        condition: service_started
 
   event-service:
     build: ./
     volumes:
       - "./client.docker.properties:/client.docker.properties"
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
+      - OTEL_SERVICE_NAME=event-service
     command: ["lab.tall15421542.app.event.Service", "-c", "client.docker.properties"]
     depends_on:
       init-kafka:
         condition: service_completed_successfully
+      jaeger:
+        condition: service_started
 
 
   kafka-1:

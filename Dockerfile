@@ -73,8 +73,9 @@ USER appuser
 
 # Copy the executable from the "package" stage.
 COPY --from=package build/target/app.jar app.jar
+ADD --chown=appuser:appuser --chmod=777 https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v2.13.2/opentelemetry-javaagent.jar opentelemetry-javaagent.jar
 
 EXPOSE 8080
 
-ENTRYPOINT [ "java", "-cp", "app.jar" ]
+ENTRYPOINT [ "java", "-javaagent:/opentelemetry-javaagent.jar","-cp", "app.jar" ]
 CMD ["lab.tall15421542.app.ticket.Service", "-c", "client.dev.properties"]
