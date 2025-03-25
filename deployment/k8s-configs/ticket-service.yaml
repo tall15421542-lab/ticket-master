@@ -18,7 +18,7 @@ metadata:
   labels:
     app: ticket-service 
 spec:
-  replicas: 3 
+  replicas: 1 
   selector:
     matchLabels:
       app: ticket-service 
@@ -27,6 +27,8 @@ spec:
       labels:
         app: ticket-service 
     spec:
+      nodeSelector:
+        cloud.google.com/compute-class: "Balanced"
       containers:
       - name: ticket-service 
         image: asia-east1-docker.pkg.dev/ticket-master-tall15421542/ticket-master/service:latest
@@ -53,8 +55,8 @@ spec:
             readOnly: true
         resources:
           requests:
-            memory: "2G"
-            cpu: "500m"
+            memory: "8G"
+            cpu: "4000m"
       volumes:
         - name: client-properties
           configMap: 
