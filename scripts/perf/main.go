@@ -138,7 +138,7 @@ type Result struct {
 	elapsed     time.Duration
 }
 
-func createConcurrentRequests(host string, eventId string, numOfRequests int, resultChan chan<- Result) {
+func createConcurrentRequests(host string, eventId string, numOfRequests int, resultChan chan<- Result, timeOfSleep time.Duration) {
 	var wg sync.WaitGroup
 
 	for i := 0; i < numOfRequests; i = i + 1 {
@@ -166,6 +166,8 @@ func createConcurrentRequests(host string, eventId string, numOfRequests int, re
 				return
 			}
 
+			time.Sleep(timeOfSleep)
+			begin = time.Now()
 			reservation, err := getReservation(host, reservationId)
 			elapsed = time.Since(begin)
 			if err != nil {
@@ -243,6 +245,16 @@ func main() {
 				Usage:   "Number of concurrent requests",
 				Aliases: []string{"n"},
 			},
+			&cli.StringFlag{
+				Name:    "sleep",
+				Value:   "0s",
+				Usage:   "second of sleep between post and get",
+				Aliases: []string{"t"},
+				Action: func(ctx context.Context, cmd *cli.Command, v string) error {
+					_, err := time.ParseDuration(v)
+					return err
+				},
+			},
 			&cli.BoolFlag{
 				Name:  "http2",
 				Value: true,
@@ -254,11 +266,12 @@ func main() {
 			eventId := cmd.String("event")
 			numOfRequests := int(cmd.Int("reqs"))
 			enableHttp2 := cmd.Bool("http2")
+			timeOfSleep, _ := time.ParseDuration(cmd.String("sleep"))
 
 			initHttpClient(enableHttp2)
 			resultChan := make(chan Result, numOfRequests)
 
-			createConcurrentRequests(host, eventId, numOfRequests, resultChan)
+			createConcurrentRequests(host, eventId, numOfRequests, resultChan, timeOfSleep)
 			reportResults(numOfRequests, resultChan)
 			return nil
 		},
