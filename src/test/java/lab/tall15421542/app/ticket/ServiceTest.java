@@ -96,13 +96,13 @@ class ServiceTest {
         props1.putAll(props);
         props1.setProperty(StreamsConfig.STATE_DIR_CONFIG, "./tmp/1");
         service1 = new Service("localhost", port1, maxVirtualThreads);
-        service1.start(props1);
+        service1.start(props1, props1);
 
         Properties props2 = new Properties();
         props2.putAll(props);
         props2.setProperty(StreamsConfig.STATE_DIR_CONFIG, "./tmp/2");
         service2 = new Service("localhost", port2, maxVirtualThreads);
-        service2.start(props2);
+        service2.start(props2, props2);
 
         Properties consumerProperties = new Properties();
         consumerProperties.putAll(props);
