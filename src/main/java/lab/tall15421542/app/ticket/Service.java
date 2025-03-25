@@ -41,7 +41,6 @@ import org.eclipse.jetty.server.HttpConfiguration;
 import org.eclipse.jetty.server.HttpConnectionFactory;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
-import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.eclipse.jetty.util.thread.VirtualThreadPool;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.server.ManagedAsync;
@@ -87,6 +86,10 @@ public class Service extends Application {
                         .longOpt("config").hasArg().desc("Config file path").required().build())
                 .addOption(Option.builder("n")
                         .longOpt("max-virtual-threads").hasArg().desc("Config file path").build())
+                .addOption(Option.builder("pc")
+                        .longOpt("producer-config").hasArg().desc("Producer config file path").build())
+                .addOption(Option.builder("sc")
+                        .longOpt("stream-config").hasArg().desc("stream config file path").build())
                 .addOption(Option.builder("help")
                         .hasArg(false).desc("Show usage information").build());
 
@@ -101,14 +104,28 @@ public class Service extends Application {
         final int restPort = Integer.parseInt(cl.getOptionValue("port", "4403"));
         final String stateDir = cl.getOptionValue("state-dir", "/tmp/kafka-streams");
         final String configFile = cl.getOptionValue("config");
+        final String producerConfigFile = cl.getOptionValue("producer-config", "");
+        final String streamConfigFile = cl.getOptionValue("stream-config", "");
         final int maxVirtualThreads = Integer.parseInt(cl.getOptionValue("max-virtual-threads", "5000"));
 
-        Properties config = Utils.readConfig(configFile);
-        Schemas.configureSerdes(config);
+        Properties baseConfig = Utils.readConfig(configFile);
+        Schemas.configureSerdes(baseConfig);
+
+        Properties producerConfig = new Properties();
+        producerConfig.putAll(baseConfig);
+        if(!producerConfigFile.equals("")){
+            producerConfig.putAll(Utils.readConfig(producerConfigFile));
+        }
 
         final Service service = new Service(restHostname, restPort, maxVirtualThreads);
-        config.setProperty(StreamsConfig.STATE_DIR_CONFIG, stateDir);
-        service.start(config);
+        Properties streamConfig = new Properties();
+        streamConfig.putAll(baseConfig);
+        if(!streamConfigFile.equals("")){
+            streamConfig.putAll(Utils.readConfig(streamConfigFile));
+        }
+        streamConfig.setProperty(StreamsConfig.STATE_DIR_CONFIG, stateDir);
+
+        service.start(streamConfig, producerConfig);
 
         addShutdownHookAndBlock(() -> {
             try {
@@ -119,10 +136,10 @@ public class Service extends Application {
         });
     }
 
-    public void start(Properties config){
-        this.createEventProducer = startProducer(Schemas.Topics.COMMAND_EVENT_CREATE_EVENT, config);
-        this.createReservationProducer = startProducer(Schemas.Topics.COMMAND_RESERVATION_CREATE_RESERVATION, config);
-        this.streams = startKafkaStream(config);
+    public void start(Properties streamConfig, Properties producerConfig){
+        this.createEventProducer = startProducer(Schemas.Topics.COMMAND_EVENT_CREATE_EVENT, producerConfig);
+        this.createReservationProducer = startProducer(Schemas.Topics.COMMAND_RESERVATION_CREATE_RESERVATION, producerConfig);
+        this.streams = startKafkaStream(streamConfig);
 
         this.server = startJetty(this.port, this.maxVirtualThreads, this);
     }
@@ -139,11 +156,6 @@ public class Service extends Application {
         final Properties producerConfig = new Properties();
         producerConfig.putAll(defaultConfig);
         producerConfig.setProperty(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, "true");
-        producerConfig.setProperty(ProducerConfig.ACKS_CONFIG, "all");
-        producerConfig.setProperty(ProducerConfig.LINGER_MS_CONFIG,
-                defaultConfig.getProperty(ProducerConfig.LINGER_MS_CONFIG, "20"));
-        producerConfig.setProperty(ProducerConfig.COMPRESSION_TYPE_CONFIG,
-                defaultConfig.getProperty(ProducerConfig.COMPRESSION_TYPE_CONFIG, "none"));
 
         return new KafkaProducer<>(producerConfig,
                 topic.keySerde().serializer(),
@@ -359,10 +371,10 @@ public class Service extends Application {
         final ServletContextHandler context = new ServletContextHandler(ServletContextHandler.SESSIONS);
         context.setContextPath("/");
 
-        QueuedThreadPool threadPool = new QueuedThreadPool();
-        VirtualThreadPool virtualExecutor = new VirtualThreadPool();
-        virtualExecutor.setMaxThreads(maxVirtualThreads);
-        threadPool.setVirtualThreadsExecutor(virtualExecutor);
+        VirtualThreadPool threadPool = new VirtualThreadPool();
+        threadPool.setMaxThreads(maxVirtualThreads);
+        threadPool.setTracking(true);
+        threadPool.setDetailedDump(true);
 
         final Server jettyServer = new Server(threadPool);
         jettyServer.setHandler(context);
