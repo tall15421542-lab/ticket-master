@@ -271,12 +271,8 @@ public class Service extends Application {
         String reservationId = UUID.randomUUID().toString();
         ProducerRecord<String, CreateReservation> record = new ProducerRecord<>(
                 Schemas.Topics.COMMAND_RESERVATION_CREATE_RESERVATION.name(), reservationId, req);
-        createReservationProducer.send(record,((recordMetadata, e) -> {
-            if(e != null){
-                asyncResponse.resume(e);
-            }
-            asyncResponse.resume(reservationId);
-        }));
+        createReservationProducer.send(record);
+        asyncResponse.resume(reservationId);
     }
 
     private void fetchReservation(final AsyncResponse asyncResponse, final String reservationId) throws InvalidStateStoreException {
