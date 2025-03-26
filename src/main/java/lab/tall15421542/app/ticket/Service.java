@@ -22,7 +22,10 @@ import lab.tall15421542.app.utils.RocksDBConfig;
 import lab.tall15421542.app.utils.Utils;
 import org.apache.commons.cli.*;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.clients.producer.*;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.Producer;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.kafka.streams.*;
 import org.apache.kafka.streams.errors.InvalidStateStoreException;
@@ -43,19 +46,19 @@ import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.util.thread.VirtualThreadPool;
 import org.glassfish.jersey.jackson.JacksonFeature;
-import org.glassfish.jersey.server.ManagedAsync;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.servlet.ServletContainer;
-import static org.glassfish.jersey.CommonProperties.USE_VIRTUAL_THREADS;
 
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static lab.tall15421542.app.utils.Utils.addShutdownHookAndBlock;
+import static org.glassfish.jersey.CommonProperties.USE_VIRTUAL_THREADS;
 
 @Path("v1")
 public class Service extends Application {
@@ -223,14 +226,13 @@ public class Service extends Application {
     }
 
     @GET
-    @ManagedAsync
     @Path("/reservation/{reservation_id}")
     @Produces({MediaType.APPLICATION_JSON})
     public void getReservationById(@PathParam("reservation_id") final String reservationId,
                          @Suspended final AsyncResponse asyncResponse) {
-        try{
-            fetchReservation(asyncResponse, reservationId);
-        } catch (final InvalidStateStoreException e) {
+        try(var executor = Executors.newVirtualThreadPerTaskExecutor()){
+            executor.submit( () -> fetchReservation(asyncResponse, reservationId));
+        }catch (final InvalidStateStoreException e) {
             outstandingRequests.put(reservationId, asyncResponse);
         }
     }
@@ -242,7 +244,6 @@ public class Service extends Application {
     }
 
     @POST
-    @ManagedAsync
     @Path("/event")
     @Consumes({MediaType.APPLICATION_JSON})
     @Produces({MediaType.APPLICATION_JSON})
@@ -253,16 +254,15 @@ public class Service extends Application {
             Schemas.Topics.COMMAND_EVENT_CREATE_EVENT.name(),
             req.getEventName().toString(), req
         );
-        createEventProducer.send(record, (RecordMetadata metadata, Exception exception) -> {
-            if(exception != null){
-                asyncResponse.resume(exception);
-            }
-        });
-        asyncResponse.resume(eventBean);
+        try(var executor = Executors.newVirtualThreadPerTaskExecutor()){
+            executor.submit(() -> {
+                createEventProducer.send(record);
+                asyncResponse.resume(eventBean);
+            });
+        };
     }
 
     @POST
-    @ManagedAsync
     @Path("/event/{id}/reservation")
     @Consumes({MediaType.APPLICATION_JSON})
     @Produces({MediaType.TEXT_PLAIN})
@@ -272,8 +272,12 @@ public class Service extends Application {
         String reservationId = UUID.randomUUID().toString();
         ProducerRecord<String, CreateReservation> record = new ProducerRecord<>(
                 Schemas.Topics.COMMAND_RESERVATION_CREATE_RESERVATION.name(), reservationId, req);
-        createReservationProducer.send(record);
-        asyncResponse.resume(reservationId);
+        try(var executor = Executors.newVirtualThreadPerTaskExecutor()){
+            executor.submit(() -> {
+                createReservationProducer.send(record);
+                asyncResponse.resume(reservationId);
+            });
+        }
     }
 
     private void fetchReservation(final AsyncResponse asyncResponse, final String reservationId) throws InvalidStateStoreException {
@@ -393,6 +397,7 @@ public class Service extends Application {
         rc.register(binding);
         rc.register(ObjectMapperWithTimeModule.class);
         rc.register(JacksonFeature.class);
+        rc.register(new JerseyAsyncExecutorProvider(() -> Executors.newVirtualThreadPerTaskExecutor()));
         rc.property(USE_VIRTUAL_THREADS, true);
 
         final ServletContainer sc = new ServletContainer(rc);
