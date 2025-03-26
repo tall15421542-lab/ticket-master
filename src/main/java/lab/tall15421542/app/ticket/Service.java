@@ -46,6 +46,7 @@ import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.server.ManagedAsync;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.servlet.ServletContainer;
+import static org.glassfish.jersey.CommonProperties.USE_VIRTUAL_THREADS;
 
 import java.util.Map;
 import java.util.Properties;
@@ -392,6 +393,7 @@ public class Service extends Application {
         rc.register(binding);
         rc.register(ObjectMapperWithTimeModule.class);
         rc.register(JacksonFeature.class);
+        rc.property(USE_VIRTUAL_THREADS, true);
 
         final ServletContainer sc = new ServletContainer(rc);
         final ServletHolder holder = new ServletHolder(sc);
