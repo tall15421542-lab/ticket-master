@@ -216,7 +216,7 @@ public class Service extends Application {
                         .withCachingDisabled());
 
         reservationTable.toStream().foreach((reservationId, reservation) -> {
-            final AsyncResponse asyncResponse = outstandingRequests.get(reservationId);
+            final AsyncResponse asyncResponse = outstandingRequests.remove(reservationId);
             if (asyncResponse != null) {
                 asyncResponse.resume(ReservationBean.fromAvro(reservation));
             }
@@ -230,10 +230,10 @@ public class Service extends Application {
     @Produces({MediaType.APPLICATION_JSON})
     public void getReservationById(@PathParam("reservation_id") final String reservationId,
                          @Suspended final AsyncResponse asyncResponse) {
+        asyncResponse.setTimeout(10, TimeUnit.SECONDS);
+
         try(var executor = Executors.newVirtualThreadPerTaskExecutor()){
             executor.submit( () -> fetchReservation(asyncResponse, reservationId));
-        }catch (final InvalidStateStoreException e) {
-            outstandingRequests.put(reservationId, asyncResponse);
         }
     }
 
@@ -281,22 +281,19 @@ public class Service extends Application {
     }
 
     private void fetchReservation(final AsyncResponse asyncResponse, final String reservationId) throws InvalidStateStoreException {
-        // get key metadata
-        // if it's in local, fetch from local
-        // if it's in another host fetch from GET /reservation/{reservation_id} internal endpoint;
         HostInfo hostForKey = getKeyLocationOrBlock(reservationId, asyncResponse);
-        if (hostForKey == null) { //request timed out so return
-            asyncResponse.resume(Response.status(Response.Status.GATEWAY_TIMEOUT)
-                    .entity("HTTP GET timed out after \n")
-                    .build());
+
+        //request timed out so return
+        if (hostForKey == null) {
             return;
         }
 
+        // if it's in local, fetch from local
+        // if it's in another host fetch from GET /v1/reservation/{reservation_id};
         if(hostForKey.host().equals(this.hostname) && hostForKey.port() == this.port){
             fetchReservationFromLocal(reservationId, asyncResponse);
         }else{
-            final String path = "http://" + hostForKey.host() + ":" + hostForKey.port() + "/v1/reservation/" + reservationId;
-            fetchReservationFromOtherHost(path, asyncResponse);
+            fetchReservationFromOtherHost(hostForKey, reservationId, asyncResponse);
         }
     }
 
@@ -305,6 +302,8 @@ public class Service extends Application {
         Reservation reservation = reservationStore().get(reservationId);
         if(reservation == null){
             outstandingRequests.put(reservationId, asyncResponse);
+
+            // Ensure reservation does not arrive just after null check but before putting the request to outstandingRequest.
             reservation = reservationStore().get(reservationId);
             if(reservation != null){
                 outstandingRequests.remove(reservationId);
@@ -315,7 +314,8 @@ public class Service extends Application {
         }
     }
 
-    private void fetchReservationFromOtherHost(String path, AsyncResponse asyncResponse) {
+    private void fetchReservationFromOtherHost(HostInfo hostForKey, String reservationId, AsyncResponse asyncResponse) {
+        final String path = "http://" + hostForKey.host() + ":" + hostForKey.port() + "/v1/reservation/" + reservationId;
         System.out.println("Get from other host, path: " + path);
         try {
             final ReservationBean reservationBean = client.target(path)
@@ -323,8 +323,8 @@ public class Service extends Application {
                     .get(new GenericType<ReservationBean>() {
                     });
             asyncResponse.resume(reservationBean);
-        } catch (final Exception swallowed) {
-            System.out.println("GET failed."+ swallowed);
+        } catch (final WebApplicationException e) {
+            asyncResponse.resume(e);
         }
     }
 
@@ -332,28 +332,25 @@ public class Service extends Application {
     private HostInfo getKeyLocationOrBlock(@SpanAttribute("reservation_id") final String id, final AsyncResponse asyncResponse) {
         HostInfo locationOfKey = null;
         while (locationOfKey == null) {
-            try {
-                KeyQueryMetadata metadata = this.streams.queryMetadataForKey(
-                        Schemas.Stores.RESERVATION.name(),
-                        id, Schemas.Stores.RESERVATION.keySerde().serializer()
-                );
+            KeyQueryMetadata metadata = this.streams.queryMetadataForKey(
+                    Schemas.Stores.RESERVATION.name(),
+                    id, Schemas.Stores.RESERVATION.keySerde().serializer()
+            );
 
-                if(metadata != KeyQueryMetadata.NOT_AVAILABLE){
-                    locationOfKey = metadata.activeHost();
-                    break;
-                }
-            } catch (final NotFoundException swallow) {
-                // swallow
+            if(metadata != KeyQueryMetadata.NOT_AVAILABLE){
+                locationOfKey = metadata.activeHost();
+                break;
             }
 
             //The metastore is not available. This can happen on startup/rebalance.
+
+            //The response timed out so return
             if (asyncResponse.isDone()) {
-                //The response timed out so return
                 return null;
             }
             try {
                 //Sleep a bit until metadata becomes available
-                Thread.sleep(Math.min(Long.parseLong("10000"), 200));
+                Thread.sleep(200);
             } catch (final InterruptedException e) {
                 e.printStackTrace();
             }
