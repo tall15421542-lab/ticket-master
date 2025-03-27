@@ -7,7 +7,6 @@ import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
 import jakarta.ws.rs.container.AsyncResponse;
 import jakarta.ws.rs.container.CompletionCallback;
-import jakarta.ws.rs.container.ConnectionCallback;
 import jakarta.ws.rs.container.Suspended;
 import jakarta.ws.rs.core.Application;
 import jakarta.ws.rs.core.GenericType;
@@ -42,10 +41,7 @@ import org.apache.kafka.streams.state.ReadOnlyKeyValueStore;
 import org.eclipse.jetty.ee10.servlet.ServletContextHandler;
 import org.eclipse.jetty.ee10.servlet.ServletHolder;
 import org.eclipse.jetty.http2.server.HTTP2CServerConnectionFactory;
-import org.eclipse.jetty.server.HttpConfiguration;
-import org.eclipse.jetty.server.HttpConnectionFactory;
-import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.server.ServerConnector;
+import org.eclipse.jetty.server.*;
 import org.eclipse.jetty.util.thread.VirtualThreadPool;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -239,16 +235,15 @@ public class Service extends Application {
                 outstandingRequests.remove(reservationId);
             }
         });
-        asyncResponse.register(new ConnectionCallback() {
-            @Override
-            public void onDisconnect(AsyncResponse asyncResponse) {
-                outstandingRequests.remove(reservationId);
-                asyncResponse.cancel();
-            }
-        });
 
         try(var executor = Executors.newVirtualThreadPerTaskExecutor()){
-            executor.submit( () -> fetchReservation(asyncResponse, reservationId));
+            executor.submit( () -> {
+                try{
+                    fetchReservation(asyncResponse, reservationId);
+                } catch (Exception e) {
+                    asyncResponse.resume(e);
+                }
+            });
         }
     }
 
@@ -271,8 +266,12 @@ public class Service extends Application {
         );
         try(var executor = Executors.newVirtualThreadPerTaskExecutor()){
             executor.submit(() -> {
-                createEventProducer.send(record);
-                asyncResponse.resume(eventBean);
+                try{
+                    createEventProducer.send(record);
+                    asyncResponse.resume(eventBean);
+                }catch (Exception e){
+                    asyncResponse.resume(e);
+                }
             });
         };
     }
@@ -289,8 +288,12 @@ public class Service extends Application {
                 Schemas.Topics.COMMAND_RESERVATION_CREATE_RESERVATION.name(), reservationId, req);
         try(var executor = Executors.newVirtualThreadPerTaskExecutor()){
             executor.submit(() -> {
-                createReservationProducer.send(record);
-                asyncResponse.resume(reservationId);
+                try{
+                    createReservationProducer.send(record);
+                    asyncResponse.resume(reservationId);
+                } catch (Exception e){
+                    asyncResponse.resume(e);
+                }
             });
         }
     }
@@ -331,7 +334,6 @@ public class Service extends Application {
 
     private void fetchReservationFromOtherHost(HostInfo hostForKey, String reservationId, AsyncResponse asyncResponse) {
         final String path = "http://" + hostForKey.host() + ":" + hostForKey.port() + "/v1/reservation/" + reservationId;
-        System.out.println("Get from other host, path: " + path);
         try {
             final ReservationBean reservationBean = client.target(path)
                     .request(MediaType.APPLICATION_JSON_TYPE)
@@ -392,6 +394,7 @@ public class Service extends Application {
 
         final Server jettyServer = new Server(threadPool);
         jettyServer.setHandler(context);
+        jettyServer.setRequestLog(new CustomRequestLog(new Slf4jRequestLogWriter(), CustomRequestLog.EXTENDED_NCSA_FORMAT));
 
         // The HTTP configuration object.
         HttpConfiguration httpConfig = new HttpConfiguration();
@@ -410,7 +413,6 @@ public class Service extends Application {
         rc.register(binding);
         rc.register(ObjectMapperWithTimeModule.class);
         rc.register(JacksonFeature.class);
-        rc.register(new JerseyAsyncExecutorProvider(() -> Executors.newVirtualThreadPerTaskExecutor()));
         rc.property(USE_VIRTUAL_THREADS, true);
 
         final ServletContainer sc = new ServletContainer(rc);
