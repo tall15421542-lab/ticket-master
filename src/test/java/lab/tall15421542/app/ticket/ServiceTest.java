@@ -46,6 +46,7 @@ import static io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig.SCHE
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 @Testcontainers
 class ServiceTest {
@@ -139,6 +140,8 @@ class ServiceTest {
                 Schemas.Topics.STATE_USER_RESERVATION.keySerde().serializer(),
                 Schemas.Topics.STATE_USER_RESERVATION.valueSerde().serializer()
         );
+
+        //TODO: add health check to ensure service is ready.
     }
 
     @Test
@@ -227,16 +230,21 @@ class ServiceTest {
         );
         reservationKafkaProducer.send(reservationStatusUpdated);
 
-        Invocation.Builder request1 = client.target(String.format("http://localhost:%d/v1/reservation/%s", port1, reservationId)).request(MediaType.APPLICATION_JSON);
-        Response response1 = request1.get();
-        ReservationBean reservationBean = response1.readEntity(ReservationBean.class);
-        assertEquals(ReservationBean.fromAvro(reservation), reservationBean);
+        try {
+            Invocation.Builder request1 = client.target(String.format("http://localhost:%d/v1/reservation/%s", port1, reservationId)).request(MediaType.APPLICATION_JSON);
+            Response response1 = request1.get();
+            ReservationBean reservationBean = response1.readEntity(ReservationBean.class);
+            assertEquals(ReservationBean.fromAvro(reservation), reservationBean);
 
-        Invocation.Builder request2 = client.target(String.format("http://localhost:%d/v1/reservation/%s", port2, reservationId)).request(MediaType.APPLICATION_JSON);
-        Response response2 = request2.get();
-        assertEquals(200, response2.getStatus());
-        ReservationBean reservation2 = response2.readEntity(ReservationBean.class);
-        assertEquals(ReservationBean.fromAvro(reservation), reservation2);
+            Invocation.Builder request2 = client.target(String.format("http://localhost:%d/v1/reservation/%s", port2, reservationId)).request(MediaType.APPLICATION_JSON);
+            Response response2 = request2.get();
+            assertEquals(200, response2.getStatus());
+            ReservationBean reservation2 = response2.readEntity(ReservationBean.class);
+            assertEquals(ReservationBean.fromAvro(reservation), reservation2);
+        } catch (Exception e){
+            e.printStackTrace();
+            assertNull(e);
+        }
     }
 
     @Test

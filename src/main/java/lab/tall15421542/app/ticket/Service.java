@@ -6,6 +6,8 @@ import jakarta.ws.rs.*;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
 import jakarta.ws.rs.container.AsyncResponse;
+import jakarta.ws.rs.container.CompletionCallback;
+import jakarta.ws.rs.container.ConnectionCallback;
 import jakarta.ws.rs.container.Suspended;
 import jakarta.ws.rs.core.Application;
 import jakarta.ws.rs.core.GenericType;
@@ -231,6 +233,19 @@ public class Service extends Application {
     public void getReservationById(@PathParam("reservation_id") final String reservationId,
                          @Suspended final AsyncResponse asyncResponse) {
         asyncResponse.setTimeout(10, TimeUnit.SECONDS);
+        asyncResponse.register(new CompletionCallback() {
+            @Override
+            public void onComplete(Throwable throwable) {
+                outstandingRequests.remove(reservationId);
+            }
+        });
+        asyncResponse.register(new ConnectionCallback() {
+            @Override
+            public void onDisconnect(AsyncResponse asyncResponse) {
+                outstandingRequests.remove(reservationId);
+                asyncResponse.cancel();
+            }
+        });
 
         try(var executor = Executors.newVirtualThreadPerTaskExecutor()){
             executor.submit( () -> fetchReservation(asyncResponse, reservationId));
@@ -348,6 +363,7 @@ public class Service extends Application {
             if (asyncResponse.isDone()) {
                 return null;
             }
+
             try {
                 //Sleep a bit until metadata becomes available
                 Thread.sleep(200);
