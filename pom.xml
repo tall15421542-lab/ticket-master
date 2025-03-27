@@ -213,6 +213,22 @@
       <version>${testcontainers.version}</version>
       <scope>test</scope>
     </dependency>
+
+    <!-- Resilience4j for Retry Dependencies -->
+    <dependency>
+      <groupId>io.github.resilience4j</groupId>
+      <artifactId>resilience4j-retry</artifactId>
+      <version>2.3.0</version>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- State Dir Cleaning after integration test -->
+    <dependency>
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
+      <version>2.18.0</version>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>

@@ -1,5 +1,7 @@
 package lab.tall15421542.app.ticket;
 
+import io.github.resilience4j.retry.Retry;
+import io.github.resilience4j.retry.RetryConfig;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
 import jakarta.ws.rs.client.Entity;
@@ -13,6 +15,7 @@ import lab.tall15421542.app.domain.beans.AreaBean;
 import lab.tall15421542.app.domain.beans.CreateReservationBean;
 import lab.tall15421542.app.domain.beans.EventBean;
 import lab.tall15421542.app.domain.beans.ReservationBean;
+import org.apache.commons.io.FileUtils;
 import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.CreateTopicsResult;
@@ -37,16 +40,17 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.shaded.org.awaitility.Awaitility;
 import org.testcontainers.utility.DockerImageName;
 
+import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.Supplier;
 
 import static io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.*;
 
 @Testcontainers
 class ServiceTest {
@@ -95,13 +99,13 @@ class ServiceTest {
         final int maxVirtualThreads = 128;
         Properties props1 = new Properties();
         props1.putAll(props);
-        props1.setProperty(StreamsConfig.STATE_DIR_CONFIG, "./tmp/1");
+        props1.setProperty(StreamsConfig.STATE_DIR_CONFIG, "./tmp-test/1");
         service1 = new Service("localhost", port1, maxVirtualThreads);
         service1.start(props1, props1);
 
         Properties props2 = new Properties();
         props2.putAll(props);
-        props2.setProperty(StreamsConfig.STATE_DIR_CONFIG, "./tmp/2");
+        props2.setProperty(StreamsConfig.STATE_DIR_CONFIG, "./tmp-test/2");
         service2 = new Service("localhost", port2, maxVirtualThreads);
         service2.start(props2, props2);
 
@@ -194,6 +198,8 @@ class ServiceTest {
         );
 
         Invocation.Builder request = client.target(String.format("http://localhost:%d/v1/event/%s/reservation", port1, eventId)).request(MediaType.TEXT_PLAIN);
+
+
         Response response = request.post(Entity.json(req));
         assertEquals(200, response.getStatus());
         String reservationId = response.readEntity(String.class);
@@ -230,20 +236,79 @@ class ServiceTest {
         );
         reservationKafkaProducer.send(reservationStatusUpdated);
 
-        try {
-            Invocation.Builder request1 = client.target(String.format("http://localhost:%d/v1/reservation/%s", port1, reservationId)).request(MediaType.APPLICATION_JSON);
-            Response response1 = request1.get();
-            ReservationBean reservationBean = response1.readEntity(ReservationBean.class);
-            assertEquals(ReservationBean.fromAvro(reservation), reservationBean);
+        // Prevent unavailable service while rebalancing.
+        RetryConfig retryConfig = RetryConfig.<Response>custom()
+                .maxAttempts(10)
+                .waitDuration(Duration.ofSeconds(1))
+                .retryOnResult(resp -> resp.getStatus() == 500)
+                .build();
 
-            Invocation.Builder request2 = client.target(String.format("http://localhost:%d/v1/reservation/%s", port2, reservationId)).request(MediaType.APPLICATION_JSON);
-            Response response2 = request2.get();
-            assertEquals(200, response2.getStatus());
-            ReservationBean reservation2 = response2.readEntity(ReservationBean.class);
-            assertEquals(ReservationBean.fromAvro(reservation), reservation2);
-        } catch (Exception e){
-            e.printStackTrace();
-            assertNull(e);
+        Retry retry = Retry.of("ticketService", retryConfig);
+
+        Invocation.Builder request1 = client.target(String.format("http://localhost:%d/v1/reservation/%s", port1, reservationId)).request(MediaType.APPLICATION_JSON);
+        Supplier<Response> firstGetReservationSupplier = Retry.decorateSupplier(retry, () -> request1.get());
+
+        Response response1 = firstGetReservationSupplier.get();
+        assertNotNull(response1);
+        assertEquals(200, response1.getStatus());
+
+        ReservationBean reservationBean = response1.readEntity(ReservationBean.class);
+        assertEquals(ReservationBean.fromAvro(reservation), reservationBean);
+
+        Invocation.Builder request2 = client.target(String.format("http://localhost:%d/v1/reservation/%s", port2, reservationId)).request(MediaType.APPLICATION_JSON);
+        Supplier<Response> secondGetReservationSupplier = Retry.decorateSupplier(retry, () -> request2.get());
+        Response response2 = request2.get();
+
+        assertNotNull(response2);
+        assertEquals(200, response2.getStatus());
+        ReservationBean reservation2 = response2.readEntity(ReservationBean.class);
+        assertEquals(ReservationBean.fromAvro(reservation), reservation2);
+
+        String rejectedReservationId = "rejected-reservation-id";
+        Reservation rejectedReservation = new Reservation(
+                rejectedReservationId, userId, eventId, areaId, numOfSeat, numOfSeat, ReservationTypeEnum.RANDOM, reservedSeats, StateEnum.FAILED, ""
+        );
+
+        ProducerRecord<String, Reservation> rejectedReservationStatusUpdated = new ProducerRecord<>(
+                Schemas.Topics.STATE_USER_RESERVATION.name(),
+                rejectedReservationId, rejectedReservation
+        );
+
+        try {
+            Invocation.Builder rejectedRequest = client.target(String.format("http://localhost:%d/v1/reservation/%s", port1, rejectedReservationId)).request(MediaType.APPLICATION_JSON);
+
+            ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(10);
+            CompletableFuture<Response> asyncResponse = retry.executeCompletionStage(
+                    scheduler, () -> CompletableFuture.supplyAsync( () -> {
+                        try{
+                            Future<Response> asyncResp = rejectedRequest.async().get();
+                            Thread.sleep(100);
+                            return asyncResp.get();
+                        } catch (InterruptedException | ExecutionException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }))
+                    .toCompletableFuture();
+
+            Thread.sleep(2000);
+            assertTrue(service1.outstandingRequests.get(rejectedReservationId) != null
+                    || service2.outstandingRequests.get(rejectedReservationId) != null);
+
+            reservationKafkaProducer.send(rejectedReservationStatusUpdated);
+
+            asyncResponse.join();
+            assertNotNull(asyncResponse);
+            assertEquals(200, asyncResponse.get().getStatus());
+
+            ReservationBean rejectedReservationBean = asyncResponse.get().readEntity(ReservationBean.class);
+            assertEquals(ReservationBean.fromAvro(rejectedReservation), rejectedReservationBean);
+
+            assertNull(service1.outstandingRequests.get(rejectedReservationId));
+            assertNull(service2.outstandingRequests.get(rejectedReservationId));
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        } catch (ExecutionException e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -264,5 +329,6 @@ class ServiceTest {
         createReservationKafkaConsumer.close();
         reservationKafkaProducer.close();
         service1.close();
+        FileUtils.deleteDirectory(new File("./tmp-test"));
     }
 }
