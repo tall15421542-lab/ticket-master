@@ -12,3 +12,6 @@ configMapGenerator:
 - name: ticket-service.producer.properties
   files:
   - appConfig/ticket-service/producer.properties 
+- name: ticket-service.stream.properties
+  files:
+  - appConfig/ticket-service/stream.properties 

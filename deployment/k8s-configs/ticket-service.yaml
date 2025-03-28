@@ -49,7 +49,8 @@ spec:
           "-p", "8080", 
           "-n", "0", 
           "-h", "$(POD_IP)",
-          "pc", "producer-config/producer.properties"
+          "-pc", "producer-config/producer.properties",
+          "-sc", "stream-config/stream.properties"
         ]
         ports:
           - containerPort: 8080
@@ -59,6 +60,9 @@ spec:
             readOnly: true
           - name: producer-properties
             mountPath: /producer-config
+            readOnly: true
+          - name: stream-properties
+            mountPath: /stream-config
             readOnly: true
         resources:
           requests:
@@ -71,6 +75,9 @@ spec:
         - name: producer-properties
           configMap: 
             name: ticket-service.producer.properties
+        - name: stream-properties
+          configMap: 
+            name: ticket-service.stream.properties
 ---
 apiVersion: networking.gke.io/v1
 kind: HealthCheckPolicy
