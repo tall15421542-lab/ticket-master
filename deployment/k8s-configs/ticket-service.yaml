@@ -27,6 +27,8 @@ spec:
       labels:
         app: ticket-service 
     spec:
+      nodeSelector:
+         cloud.google.com/compute-class: "Balanced"
       containers:
       - name: ticket-service 
         image: asia-east1-docker.pkg.dev/ticket-master-tall15421542/ticket-master/service:latest
@@ -66,8 +68,8 @@ spec:
             readOnly: true
         resources:
           requests:
-            memory: "2G"
-            cpu: "1000m"
+            memory: "4G"
+            cpu: "1500m"
       volumes:
         - name: client-properties
           configMap: 
@@ -85,6 +87,8 @@ metadata:
   name: lb-healthcheck
 spec:
   default:
+    timeoutSec: 15
+    checkIntervalSec: 15
     logConfig:
       enabled: true 
     config:

@@ -226,7 +226,7 @@ public class Service extends Application {
     @GET
     @Path("/reservation/{reservation_id}")
     @Produces({MediaType.APPLICATION_JSON})
-    public void getReservationById(@PathParam("reservation_id") final String reservationId,
+    public void getReservationById(@SpanAttribute("reservation_id") @PathParam("reservation_id") final String reservationId,
                          @Suspended final AsyncResponse asyncResponse) {
         asyncResponse.setTimeout(10, TimeUnit.SECONDS);
         asyncResponse.register(new CompletionCallback() {
@@ -394,7 +394,6 @@ public class Service extends Application {
 
         final Server jettyServer = new Server(threadPool);
         jettyServer.setHandler(context);
-        jettyServer.setRequestLog(new CustomRequestLog(new Slf4jRequestLogWriter(), CustomRequestLog.EXTENDED_NCSA_FORMAT));
 
         // The HTTP configuration object.
         HttpConfiguration httpConfig = new HttpConfiguration();
