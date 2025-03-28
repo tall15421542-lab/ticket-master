@@ -9,3 +9,6 @@ configMapGenerator:
 - name: client.properties
   files:
   - appConfig/client.properties 
+- name: ticket-service.producer.properties
+  files:
+  - appConfig/ticket-service/producer.properties 

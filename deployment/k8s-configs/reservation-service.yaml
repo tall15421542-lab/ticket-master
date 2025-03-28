@@ -32,6 +32,10 @@ spec:
           - name: client-properties
             mountPath: /config
             readOnly: true
+        resources:
+          requests:
+            memory: "2G"
+            cpu: "500m"
       volumes:
         - name: client-properties
           configMap: 
