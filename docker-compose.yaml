@@ -42,13 +42,15 @@ services:
     environment:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
       - OTEL_SERVICE_NAME=event-service
-    command: ["lab.tall15421542.app.event.Service", "-c", "appConfig/client.docker.properties"]
+    command: ["lab.tall15421542.app.event.Service", 
+      "-c", "appConfig/client.docker.properties",
+      "-sc", "appConfig/event-service/stream.properties"
+    ]
     depends_on:
       init-kafka:
         condition: service_completed_successfully
       jaeger:
         condition: service_started
-
 
   kafka-1:
     image: apache/kafka:3.9.0
