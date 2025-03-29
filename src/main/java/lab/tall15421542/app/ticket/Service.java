@@ -120,6 +120,7 @@ public class Service extends Application {
         }
 
         final Service service = new Service(restHostname, restPort, maxVirtualThreads);
+
         Properties streamConfig = new Properties();
         streamConfig.putAll(baseConfig);
         if(!streamConfigFile.equals("")){
@@ -174,6 +175,7 @@ public class Service extends Application {
         props.setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         props.setProperty(StreamsConfig.APPLICATION_SERVER_CONFIG, this.hostname + ":" + this.port);
         props.put(StreamsConfig.ROCKSDB_CONFIG_SETTER_CLASS_CONFIG, RocksDBConfig.class);
+        props.putIfAbsent(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, "100");
         props.setProperty(StreamsConfig.METRICS_RECORDING_LEVEL_CONFIG, "DEBUG");
 
         KafkaStreams streams = new KafkaStreams(topology, props);
@@ -210,8 +212,7 @@ public class Service extends Application {
         KTable<String, Reservation> reservationTable = reservationStream.toTable(
                 Materialized.<String, Reservation, KeyValueStore<Bytes, byte[]>>as(Schemas.Stores.RESERVATION.name())
                         .withKeySerde(Schemas.Stores.RESERVATION.keySerde())
-                        .withValueSerde(Schemas.Stores.RESERVATION.valueSerde())
-                        .withCachingDisabled());
+                        .withValueSerde(Schemas.Stores.RESERVATION.valueSerde()));
 
         reservationTable.toStream().foreach((reservationId, reservation) -> {
             final AsyncResponse asyncResponse = outstandingRequests.remove(reservationId);
