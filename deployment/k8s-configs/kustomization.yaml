@@ -15,3 +15,6 @@ configMapGenerator:
 - name: ticket-service.stream.properties
   files:
   - appConfig/ticket-service/stream.properties 
+- name: event-service.stream.properties
+  files:
+  - appConfig/event-service/stream.properties 
