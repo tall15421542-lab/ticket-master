@@ -100,6 +100,10 @@ func getReservation(host string, reservationId string) (*Reservation, error) {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("%d, %s", resp.StatusCode, http.StatusText(resp.StatusCode))
+	}
+
 	getBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error reading response body: %w", err)
