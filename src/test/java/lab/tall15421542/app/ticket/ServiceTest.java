@@ -27,7 +27,6 @@ import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.KafkaFuture;
-import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.StreamsConfig;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.junit.jupiter.api.AfterAll;
@@ -97,20 +96,25 @@ class ServiceTest {
 
         props.setProperty(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
 
-        final int maxVirtualThreads = 128;
         Properties props1 = new Properties();
         props1.putAll(props);
         props1.setProperty(StreamsConfig.STATE_DIR_CONFIG, "./tmp-test/1");
         props1.setProperty(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, "20");
-        service1 = new Service("localhost", port1, maxVirtualThreads);
-        service1.start(props1, props1);
+        Properties serverConfig1 = new Properties();
+        serverConfig1.put(Service.ENABLE_REQUEST_LOG, true);
+        serverConfig1.put(Service.MAX_THREADS, 0);
+        service1 = new Service("localhost", port1);
+        service1.start(props1, props1, serverConfig1);
 
         Properties props2 = new Properties();
         props2.putAll(props);
         props2.setProperty(StreamsConfig.STATE_DIR_CONFIG, "./tmp-test/2");
         props2.setProperty(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, "20");
-        service2 = new Service("localhost", port2, maxVirtualThreads);
-        service2.start(props2, props2);
+        Properties serverConfig2 = new Properties();
+        serverConfig2.put(Service.ENABLE_REQUEST_LOG, true);
+        serverConfig2.put(Service.MAX_THREADS, 0);
+        service2 = new Service("localhost", port2);
+        service2.start(props2, props2, serverConfig2);
 
         Properties consumerProperties = new Properties();
         consumerProperties.putAll(props);
