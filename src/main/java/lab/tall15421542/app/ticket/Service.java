@@ -41,7 +41,10 @@ import org.apache.kafka.streams.state.ReadOnlyKeyValueStore;
 import org.eclipse.jetty.ee10.servlet.ServletContextHandler;
 import org.eclipse.jetty.ee10.servlet.ServletHolder;
 import org.eclipse.jetty.http2.server.HTTP2CServerConnectionFactory;
-import org.eclipse.jetty.server.*;
+import org.eclipse.jetty.server.HttpConfiguration;
+import org.eclipse.jetty.server.HttpConnectionFactory;
+import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.util.thread.VirtualThreadPool;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -50,10 +53,7 @@ import org.glassfish.jersey.servlet.ServletContainer;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 import static lab.tall15421542.app.utils.Utils.addShutdownHookAndBlock;
 import static org.glassfish.jersey.CommonProperties.USE_VIRTUAL_THREADS;
@@ -69,6 +69,8 @@ public class Service extends Application {
     final Map<String, AsyncResponse> outstandingRequests = new ConcurrentHashMap<>();
     final Client client = ClientBuilder.newBuilder().register(JacksonFeature.class).build();
     Server server;
+    int count = 0;
+    ExecutorService virtualExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
     public Service(String hostname, int port, int maxVirtualThreads){
         this.hostname = hostname;
@@ -148,11 +150,13 @@ public class Service extends Application {
     }
 
     public void close() throws Exception {
+        this.virtualExecutor.close();
         createEventProducer.close();
         createReservationProducer.close();
         this.streams.close();
         this.server.stop();
         this.server.join();
+        System.out.println(outstandingRequests);
     }
 
     public static <T> KafkaProducer startProducer(final Schemas.Topic<String, T> topic, final Properties defaultConfig) {
@@ -216,8 +220,10 @@ public class Service extends Application {
 
         reservationTable.toStream().foreach((reservationId, reservation) -> {
             final AsyncResponse asyncResponse = outstandingRequests.remove(reservationId);
-            if (asyncResponse != null) {
-                asyncResponse.resume(ReservationBean.fromAvro(reservation));
+            if (asyncResponse != null && asyncResponse.isSuspended()) {
+                virtualExecutor.submit(()-> {
+                    asyncResponse.resume(ReservationBean.fromAvro(reservation));
+                });
             }
         });
 
@@ -237,15 +243,13 @@ public class Service extends Application {
             }
         });
 
-        try(var executor = Executors.newVirtualThreadPerTaskExecutor()){
-            executor.submit( () -> {
-                try{
-                    fetchReservation(asyncResponse, reservationId);
-                } catch (Exception e) {
-                    asyncResponse.resume(e);
-                }
-            });
-        }
+        virtualExecutor.submit( () -> {
+            try{
+                fetchReservation(asyncResponse, reservationId);
+            } catch (Exception e) {
+                asyncResponse.resume(e);
+            }
+        });
     }
 
     @GET
@@ -265,16 +269,14 @@ public class Service extends Application {
             Schemas.Topics.COMMAND_EVENT_CREATE_EVENT.name(),
             req.getEventName().toString(), req
         );
-        try(var executor = Executors.newVirtualThreadPerTaskExecutor()){
-            executor.submit(() -> {
-                try{
-                    createEventProducer.send(record);
-                    asyncResponse.resume(eventBean);
-                }catch (Exception e){
-                    asyncResponse.resume(e);
-                }
-            });
-        };
+        virtualExecutor.submit(() -> {
+            try{
+                createEventProducer.send(record);
+                asyncResponse.resume(eventBean);
+            }catch (Exception e){
+                asyncResponse.resume(e);
+            }
+        });
     }
 
     @POST
@@ -287,16 +289,14 @@ public class Service extends Application {
         String reservationId = UUID.randomUUID().toString();
         ProducerRecord<String, CreateReservation> record = new ProducerRecord<>(
                 Schemas.Topics.COMMAND_RESERVATION_CREATE_RESERVATION.name(), reservationId, req);
-        try(var executor = Executors.newVirtualThreadPerTaskExecutor()){
-            executor.submit(() -> {
-                try{
-                    createReservationProducer.send(record);
-                    asyncResponse.resume(reservationId);
-                } catch (Exception e){
-                    asyncResponse.resume(e);
-                }
-            });
-        }
+        virtualExecutor.submit(() -> {
+            try{
+                createReservationProducer.send(record);
+                asyncResponse.resume(reservationId);
+            } catch (Exception e){
+                asyncResponse.resume(e);
+            }
+        });
     }
 
     private void fetchReservation(final AsyncResponse asyncResponse, final String reservationId) throws InvalidStateStoreException {
