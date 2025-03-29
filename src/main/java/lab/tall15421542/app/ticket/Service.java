@@ -41,14 +41,13 @@ import org.apache.kafka.streams.state.ReadOnlyKeyValueStore;
 import org.eclipse.jetty.ee10.servlet.ServletContextHandler;
 import org.eclipse.jetty.ee10.servlet.ServletHolder;
 import org.eclipse.jetty.http2.server.HTTP2CServerConnectionFactory;
-import org.eclipse.jetty.server.HttpConfiguration;
-import org.eclipse.jetty.server.HttpConnectionFactory;
-import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.server.ServerConnector;
+import org.eclipse.jetty.server.*;
 import org.eclipse.jetty.util.thread.VirtualThreadPool;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.servlet.ServletContainer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 import java.util.Properties;
@@ -64,18 +63,18 @@ public class Service extends Application {
     Producer<String, CreateReservation> createReservationProducer;
     private String hostname;
     private int port;
-    private int maxVirtualThreads;
     KafkaStreams streams;
     final Map<String, AsyncResponse> outstandingRequests = new ConcurrentHashMap<>();
     final Client client = ClientBuilder.newBuilder().register(JacksonFeature.class).build();
     Server server;
-    int count = 0;
     ExecutorService virtualExecutor = Executors.newVirtualThreadPerTaskExecutor();
+    final static Logger logger = LoggerFactory.getLogger(Service.class);
+    final static String ENABLE_REQUEST_LOG = "enable.request.log";
+    final static String MAX_THREADS = "max.threads";
 
-    public Service(String hostname, int port, int maxVirtualThreads){
+    public Service(String hostname, int port){
         this.hostname = hostname;
         this.port = port;
-        this.maxVirtualThreads = maxVirtualThreads;
     }
 
     public static void main(final String[] args) throws Exception {
@@ -89,16 +88,24 @@ public class Service extends Application {
                 .addOption(Option.builder("c")
                         .longOpt("config").hasArg().desc("Config file path").required().build())
                 .addOption(Option.builder("n")
-                        .longOpt("max-virtual-threads").hasArg().desc("Config file path").build())
+                        .longOpt("max-threads").hasArg().desc("Max threads created by jetty").build())
                 .addOption(Option.builder("pc")
                         .longOpt("producer-config").hasArg().desc("Producer config file path").build())
                 .addOption(Option.builder("sc")
-                        .longOpt("stream-config").hasArg().desc("stream config file path").build())
-                .addOption(Option.builder("help")
-                        .hasArg(false).desc("Show usage information").build());
+                        .longOpt("stream-config").hasArg().desc("Stream config file path").build())
+                .addOption(Option.builder("r")
+                        .longOpt("request-logging").hasArg(false).desc("Enable request log").build());
 
-        final CommandLine cl = new DefaultParser().parse(opts, args);
-        if (cl.hasOption("help")) {
+        final CommandLine cl;
+        try{
+            cl = new DefaultParser().parse(opts, args);
+        } catch (MissingOptionException e){
+            logger.error("Missing command line options.");
+            final HelpFormatter formatter = new HelpFormatter();
+            formatter.printHelp("Ticket Service", opts);
+            return;
+        } catch (ParseException e) {
+            logger.error("Parsing command line options failed.");
             final HelpFormatter formatter = new HelpFormatter();
             formatter.printHelp("Ticket Service", opts);
             return;
@@ -110,7 +117,8 @@ public class Service extends Application {
         final String configFile = cl.getOptionValue("config");
         final String producerConfigFile = cl.getOptionValue("producer-config", "");
         final String streamConfigFile = cl.getOptionValue("stream-config", "");
-        final int maxVirtualThreads = Integer.parseInt(cl.getOptionValue("max-virtual-threads", "5000"));
+        final int maxThreads = Integer.parseInt(cl.getOptionValue("max-threads", "0"));
+        final boolean enableRequestLog = cl.hasOption("request-logging");
 
         Properties baseConfig = Utils.readConfig(configFile);
         Schemas.configureSerdes(baseConfig);
@@ -121,7 +129,7 @@ public class Service extends Application {
             producerConfig.putAll(Utils.readConfig(producerConfigFile));
         }
 
-        final Service service = new Service(restHostname, restPort, maxVirtualThreads);
+        final Service service = new Service(restHostname, restPort);
 
         Properties streamConfig = new Properties();
         streamConfig.putAll(baseConfig);
@@ -130,7 +138,10 @@ public class Service extends Application {
         }
         streamConfig.setProperty(StreamsConfig.STATE_DIR_CONFIG, stateDir);
 
-        service.start(streamConfig, producerConfig);
+        Properties serverConfig = new Properties();
+        serverConfig.put(ENABLE_REQUEST_LOG, enableRequestLog);
+        serverConfig.put(MAX_THREADS, maxThreads);
+        service.start(streamConfig, producerConfig, serverConfig);
 
         addShutdownHookAndBlock(() -> {
             try {
@@ -141,12 +152,12 @@ public class Service extends Application {
         });
     }
 
-    public void start(Properties streamConfig, Properties producerConfig){
+    public void start(Properties streamConfig, Properties producerConfig, Properties serverConfig){
         this.createEventProducer = startProducer(Schemas.Topics.COMMAND_EVENT_CREATE_EVENT, producerConfig);
         this.createReservationProducer = startProducer(Schemas.Topics.COMMAND_RESERVATION_CREATE_RESERVATION, producerConfig);
         this.streams = startKafkaStream(streamConfig);
 
-        this.server = startJetty(this.port, this.maxVirtualThreads, this);
+        this.server = startJetty(this.port, serverConfig, this);
     }
 
     public void close() throws Exception {
@@ -156,13 +167,14 @@ public class Service extends Application {
         this.streams.close();
         this.server.stop();
         this.server.join();
-        System.out.println(outstandingRequests);
+        logger.info("Outstanding Requests: {}", outstandingRequests);
     }
 
     public static <T> KafkaProducer startProducer(final Schemas.Topic<String, T> topic, final Properties defaultConfig) {
         final Properties producerConfig = new Properties();
         producerConfig.putAll(defaultConfig);
         producerConfig.setProperty(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, "true");
+        producerConfig.setProperty(ProducerConfig.CLIENT_ID_CONFIG, topic.name());
 
         return new KafkaProducer<>(producerConfig,
                 topic.keySerde().serializer(),
@@ -171,7 +183,7 @@ public class Service extends Application {
 
     private KafkaStreams startKafkaStream(Properties config){
         final Topology topology = createTopology();
-        System.out.println(topology.describe());
+        logger.info("{}", topology.describe());
 
         Properties props = new Properties();
         props.putAll(config);
@@ -180,7 +192,6 @@ public class Service extends Application {
         props.setProperty(StreamsConfig.APPLICATION_SERVER_CONFIG, this.hostname + ":" + this.port);
         props.put(StreamsConfig.ROCKSDB_CONFIG_SETTER_CLASS_CONFIG, RocksDBConfig.class);
         props.putIfAbsent(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, "100");
-        props.setProperty(StreamsConfig.METRICS_RECORDING_LEVEL_CONFIG, "DEBUG");
 
         KafkaStreams streams = new KafkaStreams(topology, props);
 
@@ -384,17 +395,21 @@ public class Service extends Application {
                         QueryableStoreTypes.keyValueStore()));
     }
 
-    public static Server startJetty(final int port, final int maxVirtualThreads, final Object binding) {
+    public static Server startJetty(final int port, final Properties config, final Object binding) {
         final ServletContextHandler context = new ServletContextHandler(ServletContextHandler.SESSIONS);
         context.setContextPath("/");
 
         VirtualThreadPool threadPool = new VirtualThreadPool();
-        threadPool.setMaxThreads(maxVirtualThreads);
-        threadPool.setTracking(true);
-        threadPool.setDetailedDump(true);
+        int max_threads = (int) config.getOrDefault(MAX_THREADS, 0);
+        threadPool.setMaxThreads(max_threads);
 
         final Server jettyServer = new Server(threadPool);
         jettyServer.setHandler(context);
+
+        boolean enableRequestLog = (boolean) config.getOrDefault(ENABLE_REQUEST_LOG, false);
+        if(enableRequestLog){
+            jettyServer.setRequestLog(new CustomRequestLog(new Slf4jRequestLogWriter(), CustomRequestLog.EXTENDED_NCSA_FORMAT));
+        }
 
         // The HTTP configuration object.
         HttpConfiguration httpConfig = new HttpConfiguration();
