@@ -100,12 +100,14 @@ class ServiceTest {
         Properties props1 = new Properties();
         props1.putAll(props);
         props1.setProperty(StreamsConfig.STATE_DIR_CONFIG, "./tmp-test/1");
+        props1.setProperty(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, "20");
         service1 = new Service("localhost", port1, maxVirtualThreads);
         service1.start(props1, props1);
 
         Properties props2 = new Properties();
         props2.putAll(props);
         props2.setProperty(StreamsConfig.STATE_DIR_CONFIG, "./tmp-test/2");
+        props2.setProperty(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, "20");
         service2 = new Service("localhost", port2, maxVirtualThreads);
         service2.start(props2, props2);
 
@@ -199,10 +201,8 @@ class ServiceTest {
 
         Invocation.Builder request = client.target(String.format("http://localhost:%d/v1/event/%s/reservation", port1, eventId)).request(MediaType.TEXT_PLAIN);
 
-
         Response response = request.post(Entity.json(req));
         assertEquals(200, response.getStatus());
-        String reservationId = response.readEntity(String.class);
 
         List<ConsumerRecord<String, CreateReservation>> actual = new CopyOnWriteArrayList<>();
         ExecutorService executorService = Executors.newSingleThreadExecutor();
@@ -224,6 +224,15 @@ class ServiceTest {
             consumingTask.cancel(true);
             executorService.awaitTermination(200, MILLISECONDS);
         }
+    }
+
+    @Test
+    void interactive_query(){
+        String userId = "mock-user-id";
+        String eventId = "mock-event-id";
+        String areaId = "A";
+        String reservationId = "test-interactive-query";
+        int numOfSeat = 2;
 
         List<Seat> reservedSeats = List.of(new Seat(0,0), new Seat(0,1));
         Reservation reservation = new Reservation(
@@ -238,12 +247,12 @@ class ServiceTest {
 
         // Prevent unavailable service while rebalancing.
         RetryConfig retryConfig = RetryConfig.<Response>custom()
-                .maxAttempts(10)
-                .waitDuration(Duration.ofSeconds(1))
+                .maxAttempts(2)
+                .waitDuration(Duration.ofSeconds(5))
                 .retryOnResult(resp -> resp.getStatus() == 500)
                 .build();
 
-        Retry retry = Retry.of("ticketService", retryConfig);
+        Retry retry = Retry.of("test-interactive-query-retry", retryConfig);
 
         Invocation.Builder request1 = client.target(String.format("http://localhost:%d/v1/reservation/%s", port1, reservationId)).request(MediaType.APPLICATION_JSON);
         Supplier<Response> firstGetReservationSupplier = Retry.decorateSupplier(retry, () -> request1.get());
@@ -252,59 +261,80 @@ class ServiceTest {
         assertNotNull(response1);
         assertEquals(200, response1.getStatus());
 
-        ReservationBean reservationBean = response1.readEntity(ReservationBean.class);
-        assertEquals(ReservationBean.fromAvro(reservation), reservationBean);
+        ReservationBean reservationBean1 = response1.readEntity(ReservationBean.class);
+        assertEquals(ReservationBean.fromAvro(reservation), reservationBean1);
 
         Invocation.Builder request2 = client.target(String.format("http://localhost:%d/v1/reservation/%s", port2, reservationId)).request(MediaType.APPLICATION_JSON);
         Supplier<Response> secondGetReservationSupplier = Retry.decorateSupplier(retry, () -> request2.get());
-        Response response2 = request2.get();
+        Response response2 = secondGetReservationSupplier.get();
 
         assertNotNull(response2);
         assertEquals(200, response2.getStatus());
-        ReservationBean reservation2 = response2.readEntity(ReservationBean.class);
-        assertEquals(ReservationBean.fromAvro(reservation), reservation2);
+        ReservationBean reservationBean2 = response2.readEntity(ReservationBean.class);
+        assertEquals(ReservationBean.fromAvro(reservation), reservationBean2);
 
-        String rejectedReservationId = "rejected-reservation-id";
-        Reservation rejectedReservation = new Reservation(
-                rejectedReservationId, userId, eventId, areaId, numOfSeat, numOfSeat, ReservationTypeEnum.RANDOM, reservedSeats, StateEnum.FAILED, ""
+        assertNull(service1.outstandingRequests.get(reservationId));
+        assertNull(service2.outstandingRequests.get(reservationId));
+    }
+
+    @Test
+    void Get_not_yet_ready_reservation(){
+        String userId = "mock-user-id";
+        String eventId = "mock-event-id";
+        String areaId = "A";
+        String reservationId = "test-interactive-query";
+        int numOfSeat = 2;
+        List<Seat> reservedSeats = List.of(new Seat(0,0), new Seat(0,1));
+        String notReadyReservationId = "not-yet-ready-reservation-id";
+
+        Reservation notReadyReservation = new Reservation(
+                notReadyReservationId, userId, eventId, areaId, numOfSeat, numOfSeat, ReservationTypeEnum.RANDOM, reservedSeats, StateEnum.FAILED, ""
         );
 
-        ProducerRecord<String, Reservation> rejectedReservationStatusUpdated = new ProducerRecord<>(
+        ProducerRecord<String, Reservation> reservationStatusUpdated = new ProducerRecord<>(
                 Schemas.Topics.STATE_USER_RESERVATION.name(),
-                rejectedReservationId, rejectedReservation
+                notReadyReservationId, notReadyReservation
         );
+
+        // Prevent unavailable service while rebalancing.
+        RetryConfig retryConfig = RetryConfig.<Response>custom()
+                .maxAttempts(15)
+                .waitDuration(Duration.ofSeconds(1))
+                .retryOnResult(resp -> resp.getStatus() == 500)
+                .build();
+
+        Retry retry = Retry.of("get-not-yet-ready-reservation-retry", retryConfig);
 
         try {
-            Invocation.Builder rejectedRequest = client.target(String.format("http://localhost:%d/v1/reservation/%s", port1, rejectedReservationId)).request(MediaType.APPLICATION_JSON);
+            Invocation.Builder rejectedRequest = client.target(String.format("http://localhost:%d/v1/reservation/%s", port1, notReadyReservationId)).request(MediaType.APPLICATION_JSON);
 
             ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(10);
             CompletableFuture<Response> asyncResponse = retry.executeCompletionStage(
-                    scheduler, () -> CompletableFuture.supplyAsync( () -> {
-                        try{
-                            Future<Response> asyncResp = rejectedRequest.async().get();
-                            Thread.sleep(100);
-                            return asyncResp.get();
-                        } catch (InterruptedException | ExecutionException e) {
-                            throw new RuntimeException(e);
-                        }
-                    }))
+                            scheduler, () -> CompletableFuture.supplyAsync( () -> {
+                                try{
+                                    Future<Response> asyncResp = rejectedRequest.async().get();
+                                    return asyncResp.get();
+                                } catch (InterruptedException | ExecutionException e) {
+                                    throw new RuntimeException(e);
+                                }
+                            }))
                     .toCompletableFuture();
 
-            Thread.sleep(2000);
-            assertTrue(service1.outstandingRequests.get(rejectedReservationId) != null
-                    || service2.outstandingRequests.get(rejectedReservationId) != null);
+            Awaitility.await().atMost(10, SECONDS)
+                    .until(() -> service1.outstandingRequests.get(notReadyReservationId) != null
+                    || service2.outstandingRequests.get(notReadyReservationId) != null);
 
-            reservationKafkaProducer.send(rejectedReservationStatusUpdated);
+            reservationKafkaProducer.send(reservationStatusUpdated);
 
             asyncResponse.join();
             assertNotNull(asyncResponse);
             assertEquals(200, asyncResponse.get().getStatus());
 
             ReservationBean rejectedReservationBean = asyncResponse.get().readEntity(ReservationBean.class);
-            assertEquals(ReservationBean.fromAvro(rejectedReservation), rejectedReservationBean);
+            assertEquals(ReservationBean.fromAvro(notReadyReservation), rejectedReservationBean);
 
-            assertNull(service1.outstandingRequests.get(rejectedReservationId));
-            assertNull(service2.outstandingRequests.get(rejectedReservationId));
+            assertNull(service1.outstandingRequests.get(notReadyReservationId));
+            assertNull(service2.outstandingRequests.get(notReadyReservationId));
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         } catch (ExecutionException e) {
