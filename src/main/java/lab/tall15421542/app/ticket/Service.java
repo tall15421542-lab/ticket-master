@@ -247,6 +247,7 @@ public class Service extends Application {
     public void getReservationById(@SpanAttribute("reservation_id") @PathParam("reservation_id") final String reservationId,
                          @Suspended final AsyncResponse asyncResponse) {
         asyncResponse.setTimeout(10, TimeUnit.SECONDS);
+
         asyncResponse.register(new CompletionCallback() {
             @Override
             public void onComplete(Throwable throwable) {
@@ -257,6 +258,12 @@ public class Service extends Application {
         virtualExecutor.submit( () -> {
             try{
                 fetchReservation(asyncResponse, reservationId);
+            } catch(InvalidStateStoreException e){
+                logger.info("Invalid State Store exception {}", e.getMessage());
+                Response resp = Response.status(Response.Status.SERVICE_UNAVAILABLE)
+                                .entity(e.getMessage())
+                                .build();
+                asyncResponse.resume(resp);
             } catch (Exception e) {
                 asyncResponse.resume(e);
             }
@@ -419,6 +426,8 @@ public class Service extends Application {
 
         // The ConnectionFactory for clear-text HTTP/2.
         HTTP2CServerConnectionFactory h2c = new HTTP2CServerConnectionFactory(httpConfig);
+
+        httpConfig.setNotifyRemoteAsyncErrors(false);
 
         ServerConnector connector = new ServerConnector(jettyServer, http11, h2c);
         connector.setPort(port);

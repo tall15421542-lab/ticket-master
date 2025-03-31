@@ -254,7 +254,7 @@ class ServiceTest {
         RetryConfig retryConfig = RetryConfig.<Response>custom()
                 .maxAttempts(2)
                 .waitDuration(Duration.ofSeconds(5))
-                .retryOnResult(resp -> resp.getStatus() == 500)
+                .retryOnResult(resp -> resp.getStatus() >= 500)
                 .build();
 
         Retry retry = Retry.of("test-interactive-query-retry", retryConfig);
@@ -304,8 +304,8 @@ class ServiceTest {
         // Prevent unavailable service while rebalancing.
         RetryConfig retryConfig = RetryConfig.<Response>custom()
                 .maxAttempts(15)
-                .waitDuration(Duration.ofSeconds(1))
-                .retryOnResult(resp -> resp.getStatus() == 500)
+                .waitDuration(Duration.ofSeconds(2))
+                .retryOnResult(resp -> resp.getStatus() >= 500)
                 .build();
 
         Retry retry = Retry.of("get-not-yet-ready-reservation-retry", retryConfig);
