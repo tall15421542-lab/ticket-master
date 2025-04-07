@@ -52,7 +52,8 @@ spec:
           "-n", "0",
           "-h", "$(POD_IP)",
           "-pc", "producer-config/producer.properties",
-          "-sc", "stream-config/stream.properties"
+          "-sc", "stream-config/stream.properties",
+          "-r"
         ]
         ports:
           - containerPort: 8080
@@ -68,8 +69,8 @@ spec:
             readOnly: true
         resources:
           requests:
-            memory: "4G"
-            cpu: "1500m"
+            memory: "8G"
+            cpu: "4000m"
       volumes:
         - name: client-properties
           configMap: 
