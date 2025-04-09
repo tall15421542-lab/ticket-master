@@ -13,7 +13,8 @@ services:
       "-p", "8080", 
       "-n", "0",
       "-pc", "appConfig/ticket-service/producer.properties",
-      "-sc", "appConfig/ticket-service/stream.properties"
+      "-sc", "appConfig/ticket-service/stream.properties",
+      "-r"
     ]
     depends_on:
       init-kafka:
