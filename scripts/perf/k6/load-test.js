@@ -4,7 +4,8 @@ import { uuidv4, randomIntBetween } from 'https://jslib.k6.io/k6-utils/1.4.0/ind
 import { Trend, Counter } from 'k6/metrics';
 import exec from 'k6/execution';
 
-const baseURL = "http://localhost:8080"
+const hostPort = __ENV.HOST_PORT ? `${__ENV.HOST_PORT}` : "localhost:8080"
+const baseURL = `http://${hostPort}`
 
 export function setup(){
     const eventId = "event-" + uuidv4();
