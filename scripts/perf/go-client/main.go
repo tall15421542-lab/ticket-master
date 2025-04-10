@@ -2,20 +2,26 @@ package main
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math"
 	"math/rand"
 	"net"
 	"net/http"
 	"os"
+	"slices"
+	"strconv"
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/hashicorp/go-retryablehttp"
+	"github.com/tcnksm/go-httpstat"
 	"github.com/urfave/cli/v3"
 	"golang.org/x/net/http2"
 )
@@ -47,14 +53,39 @@ type Reservation struct {
 	FailedReason  string `json:"failedReason"`
 }
 
+type Event struct {
+	EventName string `json:"eventName"`
+	Artist    string `json:"artist"`
+	Areas     []Area `json:"areas"`
+}
+
+type Area struct {
+	AreaId   string `json:"areaId"`
+	RowCount int    `json:"rowCount"`
+	ColCount int    `json:"colCount"`
+}
+
 var client *http.Client
+var eventId = "event-" + uuid.NewString()
 
-func createReservation(host string, createReservationReq CreateReservation) (string, error) {
-	url := fmt.Sprintf("http://%s/v1/event/mock-event-id/reservation", host)
+func createEvent(host string, numOfAreas int) (*Event, error) {
+	url := fmt.Sprintf("http://%s/v1/event", host)
+	event := Event{
+		EventName: eventId,
+		Artist:    "go-load-test",
+	}
 
-	jsonData, err := json.Marshal(createReservationReq)
+	for areaIdx := 0; areaIdx < numOfAreas; areaIdx = areaIdx + 1 {
+		event.Areas = append(event.Areas, Area{
+			AreaId:   strconv.Itoa(areaIdx),
+			RowCount: 20,
+			ColCount: 20,
+		})
+	}
+
+	jsonData, err := json.Marshal(event)
 	if err != nil {
-		return "", fmt.Errorf("Error marshaling JSON: %w", err)
+		return nil, err
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -62,58 +93,101 @@ func createReservation(host string, createReservationReq CreateReservation) (str
 
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
-		return "", fmt.Errorf("Error creating request: %w", err)
+		return nil, fmt.Errorf("Error creating request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 
-	// HTTP client
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("Error sending requests: %w", err)
+		return nil, fmt.Errorf("Error sending requests: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	var createdEvent Event
+	if err := json.Unmarshal(body, &createdEvent); err != nil {
+		return nil, fmt.Errorf("error unmarshaling JSON: %w", err)
+	}
+	return &createdEvent, nil
+}
+
+func createReservation(host string, createReservationReq CreateReservation) (string, *httpstat.Result, error) {
+	url := fmt.Sprintf("http://%s/v1/event/%s/reservation", host, eventId)
+
+	jsonData, err := json.Marshal(createReservationReq)
+	if err != nil {
+		return "", nil, fmt.Errorf("Error marshaling JSON: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	var result httpstat.Result
+	ctx = httpstat.WithHTTPStat(ctx, &result)
+
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return "", nil, fmt.Errorf("Error creating request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", &result, fmt.Errorf("Error sending requests: %w", err)
 	}
 	defer resp.Body.Close()
 
 	postBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("error reading response body: %w", err)
+		return "", &result, fmt.Errorf("error reading response body: %w", err)
 	}
+	result.End(time.Now())
 
 	reservationId := string(postBody)
-	return reservationId, nil
+	return reservationId, &result, nil
 }
 
-func getReservation(host string, reservationId string) (*Reservation, error) {
+func getReservation(host string, reservationId string) (*Reservation, *httpstat.Result, error) {
 	url := fmt.Sprintf("http://%s/v1/reservation/%s", host, reservationId)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	var result httpstat.Result
+	ctx = httpstat.WithHTTPStat(ctx, &result)
 
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("Error sending request: %w", err)
+		return nil, nil, fmt.Errorf("Error sending request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%d, %s", resp.StatusCode, http.StatusText(resp.StatusCode))
+		return nil, &result, fmt.Errorf("%d, %s", resp.StatusCode, http.StatusText(resp.StatusCode))
 	}
 
 	getBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("error reading response body: %w", err)
+		return nil, &result, fmt.Errorf("error reading response body: %w", err)
 	}
+
+	result.End(time.Now())
 
 	var reservation Reservation
 	if err := json.Unmarshal(getBody, &reservation); err != nil {
-		return nil, fmt.Errorf("error unmarshaling JSON: %w", err)
+		return nil, &result, fmt.Errorf("error unmarshaling JSON: %w", err)
 	}
-	return &reservation, nil
+	return &reservation, &result, nil
 }
 
 func initHttpClient(enableHttp2 bool) *http.Client {
@@ -139,10 +213,11 @@ func initHttpClient(enableHttp2 bool) *http.Client {
 type Result struct {
 	reservation *Reservation
 	err         error
-	elapsed     time.Duration
+	postStats   *httpstat.Result
+	getStats    *httpstat.Result
 }
 
-func createConcurrentRequests(host string, eventId string, numOfRequests int, resultChan chan<- Result, timeOfSleep time.Duration) {
+func createConcurrentRequests(host string, event *Event, numOfRequests int, resultChan chan<- Result, timeOfSleep time.Duration) {
 	var wg sync.WaitGroup
 
 	for i := 0; i < numOfRequests; i = i + 1 {
@@ -150,35 +225,35 @@ func createConcurrentRequests(host string, eventId string, numOfRequests int, re
 		go func() {
 			defer wg.Done()
 
+			areaIdx := rand.Int() % len(event.Areas)
 			req := CreateReservation{
 				UserID:     "user123",
 				EventID:    eventId,
-				AreaID:     "A",
+				AreaID:     event.Areas[areaIdx].AreaId,
 				NumOfSeats: rand.Int()%4 + 1,
 				Type:       "RANDOM",
 			}
 
-			begin := time.Now()
-			reservationId, err := createReservation(host, req)
-			elapsed := time.Since(begin)
+			reservationId, postStats, err := createReservation(host, req)
 			if err != nil {
 				resultChan <- Result{
 					reservation: nil,
 					err:         err,
-					elapsed:     elapsed,
+					postStats:   postStats,
+					getStats:    nil,
 				}
 				return
 			}
 
 			time.Sleep(timeOfSleep)
-			begin = time.Now()
-			reservation, err := getReservation(host, reservationId)
-			elapsed = time.Since(begin)
+
+			reservation, getStats, err := getReservation(host, reservationId)
 			if err != nil {
 				resultChan <- Result{
 					reservation: nil,
 					err:         err,
-					elapsed:     elapsed,
+					postStats:   postStats,
+					getStats:    getStats,
 				}
 				return
 			}
@@ -186,7 +261,8 @@ func createConcurrentRequests(host string, eventId string, numOfRequests int, re
 			resultChan <- Result{
 				reservation: reservation,
 				err:         nil,
-				elapsed:     elapsed,
+				postStats:   postStats,
+				getStats:    getStats,
 			}
 		}()
 	}
@@ -194,38 +270,96 @@ func createConcurrentRequests(host string, eventId string, numOfRequests int, re
 }
 
 func reportResults(numOfRequests int, resultChan <-chan Result) {
-	reservedSeats := make(map[Seat]bool)
+	reservedSeats := make(map[string]map[Seat]bool)
 	successReservations := 0
 	failedReservations := 0
 	errResults := 0
+
+	var reservationStats []Result
 	for i := 0; i < numOfRequests; i = i + 1 {
 		result := <-resultChan
 		if result.err != nil {
 			errResults = errResults + 1
-			fmt.Println(i, result.elapsed, result.err)
+			fmt.Println(result.err)
 			continue
 		}
 
+		reservationStats = append(reservationStats, result)
 		reservation := result.reservation
+		areaID := reservation.AreaID
+		if reservedSeats[areaID] == nil {
+			reservedSeats[areaID] = make(map[Seat]bool)
+		}
+
 		if reservation.State == "RESERVED" {
 			successReservations = successReservations + 1
 			for _, seat := range reservation.Seats {
-				if reservedSeats[seat] == true {
+				if reservedSeats[areaID][seat] == true {
 					log.Fatalf("seat (%d, %d) is already reserved", seat.Row, seat.Col)
 				}
-				reservedSeats[seat] = true
+				reservedSeats[areaID][seat] = true
 			}
 		} else {
 			failedReservations = failedReservations + 1
 		}
-
-		fmt.Println(i, result.elapsed, result.reservation)
 	}
 
+	reportResponseTimeStats(reservationStats)
 	fmt.Println("successful reservations:", successReservations)
 	fmt.Println("failed reservations:", failedReservations)
 	fmt.Println("err results:", errResults)
-	fmt.Println("num of reserved seats", len(reservedSeats))
+
+	totalReservedSeats := 0
+	for areaID := range reservedSeats {
+		fmt.Println("area: ", areaID, "- num of reserved seats:", len(reservedSeats[areaID]))
+		totalReservedSeats = totalReservedSeats + len(reservedSeats[areaID])
+	}
+	fmt.Println("Total reserved Seats: ", totalReservedSeats)
+}
+
+func reportResponseTimeStats(reservationStats []Result) {
+	slices.SortFunc(reservationStats, func(r1 Result, r2 Result) int {
+		return cmp.Compare(getResponseTime(r1), getResponseTime(r2))
+	})
+
+	fmt.Println("P50: ", getPercentileResult(reservationStats, 50), "ms")
+	fmt.Println("P95: ", getPercentileResult(reservationStats, 95), "ms")
+	fmt.Println("P99: ", getPercentileResult(reservationStats, 99), "ms")
+}
+
+func getResponseTime(result Result) int64 {
+	var time time.Duration
+	if result.postStats != nil {
+		time = time + result.postStats.ServerProcessing
+	}
+
+	if result.getStats != nil {
+		time = time + result.getStats.ServerProcessing
+	}
+	return time.Milliseconds()
+}
+
+func getPercentileResult(reservationStats []Result, percentileInt int) float64 {
+	if len(reservationStats) == 0 {
+		return 0
+	}
+
+	percentile := float64(percentileInt) / 100.
+
+	numOfRequests := len(reservationStats)
+	percentileIdx := float64(numOfRequests-1) * percentile
+
+	lowIdx := int(math.Floor(percentileIdx))
+	highIdx := int(math.Ceil(percentileIdx))
+
+	if lowIdx == highIdx {
+		return float64(getResponseTime(reservationStats[lowIdx]))
+	}
+
+	responseTime1 := getResponseTime(reservationStats[lowIdx])
+	responseTime2 := getResponseTime(reservationStats[highIdx])
+
+	return float64(responseTime1)*(float64(highIdx)-percentileIdx) + float64(responseTime2)*(percentileIdx-float64(lowIdx))
 }
 
 func main() {
@@ -237,17 +371,17 @@ func main() {
 				Value: "localhost:8080",
 				Usage: "ticket service host",
 			},
-			&cli.StringFlag{
-				Name:    "event",
-				Value:   "mock-event-id-b",
-				Usage:   "event id",
-				Aliases: []string{"e"},
-			},
 			&cli.IntFlag{
 				Name:    "reqs",
 				Value:   20,
 				Usage:   "Number of concurrent requests",
 				Aliases: []string{"n"},
+			},
+			&cli.IntFlag{
+				Name:    "numOfAreas",
+				Value:   1,
+				Usage:   "Number of Areas",
+				Aliases: []string{"a"},
 			},
 			&cli.StringFlag{
 				Name:    "sleep",
@@ -267,15 +401,20 @@ func main() {
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			host := cmd.String("host")
-			eventId := cmd.String("event")
 			numOfRequests := int(cmd.Int("reqs"))
 			enableHttp2 := cmd.Bool("http2")
 			timeOfSleep, _ := time.ParseDuration(cmd.String("sleep"))
+			numOfAreas := int(cmd.Int("numOfAreas"))
 
 			initHttpClient(enableHttp2)
 			resultChan := make(chan Result, numOfRequests)
 
-			createConcurrentRequests(host, eventId, numOfRequests, resultChan, timeOfSleep)
+			event, err := createEvent(host, numOfAreas)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			createConcurrentRequests(host, event, numOfRequests, resultChan, timeOfSleep)
 			reportResults(numOfRequests, resultChan)
 			return nil
 		},
