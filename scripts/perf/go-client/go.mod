@@ -9,6 +9,8 @@ require (
 )
 
 require (
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
+	github.com/tcnksm/go-httpstat v0.2.0 // indirect
 	golang.org/x/text v0.23.0 // indirect
 )
