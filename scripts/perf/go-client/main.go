@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -23,8 +24,29 @@ import (
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/tcnksm/go-httpstat"
 	"github.com/urfave/cli/v3"
+	"go.uber.org/zap"
 	"golang.org/x/net/http2"
 )
+
+type SugaredLeveledLogger struct {
+	logger *zap.SugaredLogger
+}
+
+func (s SugaredLeveledLogger) Error(msg string, keysAndValues ...interface{}) {
+	s.logger.Errorw(msg, keysAndValues...)
+}
+
+func (s SugaredLeveledLogger) Info(msg string, keysAndValues ...interface{}) {
+	s.logger.Infow(msg, keysAndValues...)
+}
+
+func (s SugaredLeveledLogger) Debug(msg string, keysAndValues ...interface{}) {
+	s.logger.Debugw(msg, keysAndValues...)
+}
+
+func (s SugaredLeveledLogger) Warn(msg string, keysAndValues ...interface{}) {
+	s.logger.Warnw(msg, keysAndValues...)
+}
 
 type CreateReservation struct {
 	UserID     string `json:"userId"`
@@ -67,6 +89,7 @@ type Area struct {
 
 var client *http.Client
 var eventId = "event-" + uuid.NewString()
+var logger *zap.SugaredLogger
 
 func createEvent(host string, numOfAreas int) (*Event, error) {
 	url := fmt.Sprintf("http://%s/v1/event", host)
@@ -193,6 +216,7 @@ func getReservation(host string, reservationId string) (*Reservation, *httpstat.
 func initHttpClient(enableHttp2 bool) *http.Client {
 	retryClient := retryablehttp.NewClient()
 	retryClient.RetryMax = 20
+	retryClient.Logger = SugaredLeveledLogger{logger: logger}
 
 	if enableHttp2 {
 		var protocols http.Protocols
@@ -278,16 +302,18 @@ func reportResults(numOfRequests int, resultChan <-chan Result) {
 	errResults := 0
 
 	var reservationStats []Result
+
 	for i := 0; i < numOfRequests; i = i + 1 {
 		result := <-resultChan
 		if result.err != nil {
 			errResults = errResults + 1
-			fmt.Println(result.err)
+			logger.Error(result.err)
 			continue
 		}
-
 		reservationStats = append(reservationStats, result)
 		reservation := result.reservation
+		logger.Debugln(reservation)
+
 		areaID := reservation.AreaID
 		if reservedSeats[areaID] == nil {
 			reservedSeats[areaID] = make(map[Seat]bool)
@@ -307,16 +333,16 @@ func reportResults(numOfRequests int, resultChan <-chan Result) {
 	}
 
 	reportResponseTimeStats(reservationStats)
-	fmt.Println("successful reservations:", successReservations)
-	fmt.Println("failed reservations:", failedReservations)
-	fmt.Println("err results:", errResults)
+	logger.Infoln("successful reservations:", successReservations)
+	logger.Infoln("failed reservations:", failedReservations)
+	logger.Infoln("err results:", errResults)
 
 	totalReservedSeats := 0
 	for areaID := range reservedSeats {
-		fmt.Println("area: ", areaID, "- num of reserved seats:", len(reservedSeats[areaID]))
+		logger.Infoln("area: ", areaID, "- num of reserved seats:", len(reservedSeats[areaID]))
 		totalReservedSeats = totalReservedSeats + len(reservedSeats[areaID])
 	}
-	fmt.Println("Total reserved Seats: ", totalReservedSeats)
+	logger.Infoln("Total reserved Seats: ", totalReservedSeats)
 }
 
 func reportResponseTimeStats(reservationStats []Result) {
@@ -324,9 +350,9 @@ func reportResponseTimeStats(reservationStats []Result) {
 		return cmp.Compare(getResponseTime(r1), getResponseTime(r2))
 	})
 
-	fmt.Println("P50: ", getPercentileResult(reservationStats, 50), "ms")
-	fmt.Println("P95: ", getPercentileResult(reservationStats, 95), "ms")
-	fmt.Println("P99: ", getPercentileResult(reservationStats, 99), "ms")
+	logger.Infoln("P50: ", getPercentileResult(reservationStats, 50), "ms")
+	logger.Infoln("P95: ", getPercentileResult(reservationStats, 95), "ms")
+	logger.Infoln("P99: ", getPercentileResult(reservationStats, 99), "ms")
 }
 
 func getResponseTime(result Result) int64 {
@@ -395,6 +421,19 @@ func main() {
 					return err
 				},
 			},
+			&cli.StringFlag{
+				Name:    "env",
+				Value:   "dev",
+				Usage:   "environment",
+				Aliases: []string{"e"},
+				Action: func(ctx context.Context, cmd *cli.Command, v string) error {
+					if v != "dev" && v != "prod" {
+						return errors.New(fmt.Sprintf("env flag should be one of 'dev' or 'prod', got %s", v))
+					}
+					return nil
+				},
+			},
+
 			&cli.BoolFlag{
 				Name:  "http2",
 				Value: false,
@@ -407,6 +446,17 @@ func main() {
 			enableHttp2 := cmd.Bool("http2")
 			timeOfSleep, _ := time.ParseDuration(cmd.String("sleep"))
 			numOfAreas := int(cmd.Int("numOfAreas"))
+			env := cmd.String("env")
+
+			var zapLogger *zap.Logger
+			if env == "dev" {
+				zapLogger, _ = zap.NewDevelopment()
+			} else {
+				zapLogger, _ = zap.NewProduction()
+			}
+
+			defer zapLogger.Sync()
+			logger = zapLogger.Sugar()
 
 			initHttpClient(enableHttp2)
 			resultChan := make(chan Result, numOfRequests)
@@ -415,6 +465,12 @@ func main() {
 			if err != nil {
 				log.Fatal(err)
 			}
+
+			logger.Debugln(event)
+
+			logger.Infof("Waiting event %s ready for 2 seconds\n", event.EventName)
+			time.Sleep(2 * time.Second)
+			logger.Infoln("Completed")
 
 			createConcurrentRequests(host, event, numOfRequests, resultChan, timeOfSleep)
 			reportResults(numOfRequests, resultChan)
