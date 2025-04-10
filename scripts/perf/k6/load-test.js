@@ -1,10 +1,10 @@
 import http from 'k6/http';
 import { check, group } from 'k6';
 import { uuidv4, randomIntBetween } from 'https://jslib.k6.io/k6-utils/1.4.0/index.js';
-import { Trend } from 'k6/metrics';
+import { Trend, Counter } from 'k6/metrics';
 import exec from 'k6/execution';
 
-const baseURL = "http://35.206.204.178"
+const baseURL = "http://localhost:8080"
 
 export function setup(){
     const eventId = "event-" + uuidv4();
@@ -39,29 +39,31 @@ export function setup(){
 export const options = {
   discardResponseBodies: true,
   scenarios: {
-    spike: {
-      executor: 'constant-arrival-rate',
+    stress: {
+      executor: 'ramping-arrival-rate',
+      startRate: 1000,
 
-      // How long the test lasts
-      duration: '1s',
-
-      // How many iterations per timeUnit
-      rate: 10000,
-
-      // Start `rate` iterations per second
       timeUnit: '1s',
 
-      // Pre-allocate 2 VUs before starting the test
-      preAllocatedVUs: 20000,
+      preAllocatedVUs: 1000,
 
-      // Spin up a maximum of 50 VUs to sustain the defined
-      // constant arrival rate.
+      stages: [
+        { target: 1000, duration: '5s' },
+
+        { target: 1500, duration: '5s' },
+
+        { target: 2000, duration: '1m' },
+
+        { target: 1000, duration: '5s' },
+      ],
+
       gracefulStop: '10s',
     },
   },
 };
 
 const reservationTime = new Trend('reservation_time', true);
+const reservationCounter = new Counter('reservation_completed')
 
 export default function (eventId) {
     group('reserve seats', function(){
@@ -73,28 +75,38 @@ export default function (eventId) {
             type: "RANDOM"
         })
 
-        const params = {
+        const postParams = {
             headers: {
                 'Content-Type': 'application/json',
             },
             responseType: "text",
         };
+
         const reserve_seats_url = `${baseURL}/v1/event/${eventId}/reservation`
-        const reserve_seats_res = http.post(reserve_seats_url, payload, params)
+        const reserve_seats_res = http.post(reserve_seats_url, payload, postParams)
         check(reserve_seats_res, {
             'status is 200': (r) => r.status === 200,
         });
-        console.log(reserve_seats_res.body)
+
+        if(reserve_seats_res.status != 200) {
+            return;
+        }
         
         const reservationId = reserve_seats_res.body
         const get_reservation_url = `${baseURL}/v1/reservation/${reservationId}`
-        const get_reservation_res = http.get(get_reservation_url, params)
+        const getParams = {
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        }
+        const get_reservation_res = http.get(http.url`${get_reservation_url}`, getParams)
         check(get_reservation_res, {
             'status is 200': (r) => r.status === 200,
         })
 
-        const reservation = JSON.parse(get_reservation_res.body)
-        console.log(reservation.state, reservation.seats, reservation.failedReason)
         reservationTime.add(reserve_seats_res.timings.duration + get_reservation_res.timings.duration, [`${exec.vu.tags}`])
+        if(get_reservation_res.status === 200){
+            reservationCounter.add(1)
+        }
     })
 }
