@@ -124,7 +124,7 @@ func createReservation(host string, createReservationReq CreateReservation) (str
 		return "", nil, fmt.Errorf("Error marshaling JSON: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	var result httpstat.Result
@@ -155,7 +155,7 @@ func createReservation(host string, createReservationReq CreateReservation) (str
 
 func getReservation(host string, reservationId string) (*Reservation, *httpstat.Result, error) {
 	url := fmt.Sprintf("http://%s/v1/reservation/%s", host, reservationId)
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
 	defer cancel()
 
 	var result httpstat.Result
@@ -192,21 +192,23 @@ func getReservation(host string, reservationId string) (*Reservation, *httpstat.
 
 func initHttpClient(enableHttp2 bool) *http.Client {
 	retryClient := retryablehttp.NewClient()
-	retryClient.RetryMax = 5
-
-	client = retryClient.StandardClient() // *http.Client
+	retryClient.RetryMax = 20
 
 	if enableHttp2 {
 		var protocols http.Protocols
 		protocols.SetUnencryptedHTTP2(true)
-		client.Transport = &http2.Transport{
-			AllowHTTP: true,
-			DialTLS: func(network, addr string, cfg *tls.Config) (net.Conn, error) {
-				return net.Dial(network, addr)
+		httpClient := &http.Client{
+			Transport: &http2.Transport{
+				AllowHTTP: true,
+				DialTLS: func(network, addr string, cfg *tls.Config) (net.Conn, error) {
+					return net.Dial(network, addr)
+				},
 			},
 		}
+		retryClient.HTTPClient = httpClient
 	}
 
+	client = retryClient.StandardClient() // *http.Client
 	return client
 }
 
@@ -395,7 +397,7 @@ func main() {
 			},
 			&cli.BoolFlag{
 				Name:  "http2",
-				Value: true,
+				Value: false,
 				Usage: "Enable http2",
 			},
 		},
