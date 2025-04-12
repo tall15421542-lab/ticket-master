@@ -75,11 +75,11 @@ public class Schemas{
             STATE_EVENT_AREA_STATUS = new Topic<>("state.event.area_status", Serdes.String(), new SpecificAvroSerde<>());
             ALL.put("state.event.area_status", STATE_EVENT_AREA_STATUS);
 
-            // key: user id
+            // key: reservation id
             COMMAND_RESERVATION_CREATE_RESERVATION = new Topic<>("command.reservation.create_reservation", Serdes.String(), new SpecificAvroSerde<>());
             ALL.put("command.reservation.create_reservation", COMMAND_RESERVATION_CREATE_RESERVATION);
 
-            // key user id
+            // key: reservation id
             STATE_USER_RESERVATION = new Topic<>("state.user.reservation", Serdes.String(), new SpecificAvroSerde<>());
             ALL.put("state.user.reservation", STATE_USER_RESERVATION);
         }
