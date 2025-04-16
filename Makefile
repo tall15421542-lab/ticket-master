@@ -5,8 +5,8 @@ deploy:
 	$(info export TF_VAR_confluent_cloud_api_secret="{Confluent_Cloud_API_Secret}")
 	terraform -chdir=deployment/terraform plan -var "partitions_count=${PARTITIONS_COUNT}"
 	terraform -chdir=deployment/terraform apply -auto-approve -var "partitions_count=${PARTITIONS_COUNT}" 
-	terraform -chdir=deployment/terraform output -raw cluster_properties > deployment/k8s-configs/appConfig/client.properties
-	kubectl apply -k deployment/k8s-configs/
+	terraform -chdir=deployment/terraform output -raw cluster_properties > deployment/k8s-configs/base/appConfig/client.properties
+	kubectl apply -k deployment/k8s-configs/overlays/perf
 destroy:
-	kubectl delete -k deployment/k8s-configs/
+	kubectl delete -k deployment/k8s-configs/overlays/perf
 	terraform -chdir=deployment/terraform destroy -target=module.confluent_kafka -auto-approve 
