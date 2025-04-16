@@ -58,6 +58,7 @@ RUN --mount=type=bind,source=pom.xml,target=pom.xml \
 # eclipse-temurin@sha256:99cede493dfd88720b610eb8077c8688d3cca50003d76d1d539b0efc8cca72b4.
 FROM eclipse-temurin:23-jre AS final
 
+RUN apt-get update && apt-get install libjemalloc2
 # Create a non-privileged user that the app will run under.
 # See https://docs.docker.com/go/dockerfile-user-best-practices/
 ARG UID=10001
@@ -77,5 +78,6 @@ ADD --chown=appuser:appuser --chmod=777 https://github.com/open-telemetry/opente
 
 EXPOSE 8080
 
+ENV LD_PRELOAD="/usr/lib/aarch64-linux-gnu/libjemalloc.so.2"
 ENTRYPOINT [ "java", "-javaagent:/opentelemetry-javaagent.jar","-cp", "app.jar" ]
 CMD ["lab.tall15421542.app.ticket.Service", "-c", "client.dev.properties"]
