@@ -69,8 +69,8 @@ spec:
             readOnly: true
         resources:
           requests:
-            memory: "8G"
-            cpu: "4000m"
+            memory: "2G"
+            cpu: "500m"
       volumes:
         - name: client-properties
           configMap: 
