@@ -71,6 +71,28 @@ spec:
           requests:
             memory: "2G"
             cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: v1/health_check
+            port: 8080 
+          failureThreshold: 5 
+          periodSeconds: 10
+          initialDelaySeconds: 5
+
+        readinessProbe:
+          httpGet:
+            path: v1/health_check
+            port: 8080 
+          failureThreshold: 3
+          periodSeconds: 10
+          initialDelaySeconds: 5
+
+        startupProbe:
+          httpGet:
+            path: v1/health_check
+            port: 8080
+          failureThreshold: 30
+          periodSeconds: 10
       volumes:
         - name: client-properties
           configMap: 

@@ -273,6 +273,9 @@ public class Service extends Application {
     @GET
     @Path("health_check")
     public Response healthCheck() {
+        if(this.streams.state() != KafkaStreams.State.RUNNING){
+            return Response.status(Response.Status.SERVICE_UNAVAILABLE).build();
+        }
         return Response.status(Response.Status.OK).build();
     }
 
