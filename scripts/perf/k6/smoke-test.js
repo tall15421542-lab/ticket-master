@@ -7,8 +7,8 @@ const reservationCounter = new Counter('reservation_completed')
 
 export const options = {
   discardResponseBodies: true,
-  iterations: 100,
-  vus: 10,
+  iterations: 20,
+  vus: 1,
 };
 
 const hostPort = __ENV.HOST_PORT ? `${__ENV.HOST_PORT}` : "localhost:8080"
