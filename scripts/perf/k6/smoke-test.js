@@ -7,28 +7,8 @@ const reservationCounter = new Counter('reservation_completed')
 
 export const options = {
   discardResponseBodies: true,
-  scenarios: {
-    stress: {
-      executor: 'ramping-arrival-rate',
-      startRate: 1000,
-
-      timeUnit: '1s',
-
-      preAllocatedVUs: 1000,
-
-      stages: [
-        { target: 1000, duration: '5s' },
-
-        { target: 1500, duration: '5s' },
-
-        { target: 2000, duration: '1m' },
-
-        { target: 1000, duration: '5s' },
-      ],
-
-      gracefulStop: '10s',
-    } 
-  },
+  iterations: 100,
+  vus: 10,
 };
 
 const hostPort = __ENV.HOST_PORT ? `${__ENV.HOST_PORT}` : "localhost:8080"
