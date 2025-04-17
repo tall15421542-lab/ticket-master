@@ -78,6 +78,6 @@ ADD --chown=appuser:appuser --chmod=777 https://github.com/open-telemetry/opente
 
 EXPOSE 8080
 
-ENV LD_PRELOAD="/usr/lib/aarch64-linux-gnu/libjemalloc.so.2"
+ENV LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libjemalloc.so.2"
 ENTRYPOINT [ "java", "-javaagent:/opentelemetry-javaagent.jar","-cp", "app.jar" ]
 CMD ["lab.tall15421542.app.ticket.Service", "-c", "client.dev.properties"]
