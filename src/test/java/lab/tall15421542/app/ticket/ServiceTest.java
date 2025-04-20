@@ -101,6 +101,7 @@ class ServiceTest {
         props1.putAll(props);
         props1.setProperty(StreamsConfig.STATE_DIR_CONFIG, "./tmp-test/1");
         props1.setProperty(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, "20");
+        props1.setProperty(StreamsConfig.PROCESSING_GUARANTEE_CONFIG, "exactly_once_v2");
         Properties serverConfig1 = new Properties();
         serverConfig1.put(ENABLE_REQUEST_LOG, true);
         serverConfig1.put(Service.MAX_THREADS, 0);
@@ -111,6 +112,7 @@ class ServiceTest {
         props2.putAll(props);
         props2.setProperty(StreamsConfig.STATE_DIR_CONFIG, "./tmp-test/2");
         props2.setProperty(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, "20");
+        props2.setProperty(StreamsConfig.PROCESSING_GUARANTEE_CONFIG, "exactly_once_v2");
         Properties serverConfig2 = new Properties();
         serverConfig2.put(ENABLE_REQUEST_LOG, true);
         serverConfig2.put(Service.MAX_THREADS, 0);
