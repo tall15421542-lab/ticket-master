@@ -18,7 +18,10 @@ spec:
       - name: reservation-service 
         image: asia-east1-docker.pkg.dev/ticket-master-tall15421542/ticket-master/service:latest
         command: ["java", "-javaagent:/opentelemetry-javaagent.jar","-Djava.security.manager=allow", "-cp", "app.jar"]
-        args: ["lab.tall15421542.app.reservation.Service", "-c", "config/client.properties"]
+        args: ["lab.tall15421542.app.reservation.Service", 
+          "-c", "config/client.properties",
+          "-sc", "stream-config/stream.properties"
+        ]
         env:
           - name: OTEL_SERVICE_NAME
             value: "reservation-service"
@@ -32,6 +35,9 @@ spec:
           - name: client-properties
             mountPath: /config
             readOnly: true
+          - name: stream-properties
+            mountPath: /stream-config
+            readOnly: true
         resources:
           requests:
             memory: "2G"
@@ -40,3 +46,6 @@ spec:
         - name: client-properties
           configMap: 
             name: client.properties
+        - name: stream-properties
+          configMap: 
+            name: reservation-service.stream.properties
