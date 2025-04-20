@@ -151,6 +151,7 @@ public class Service extends Application {
             streamConfig.putAll(Utils.readConfig(streamConfigFile));
         }
         streamConfig.setProperty(StreamsConfig.STATE_DIR_CONFIG, stateDir);
+        streamConfig.setProperty(StreamsConfig.PROCESSING_GUARANTEE_CONFIG, "exactly_once_v2");
 
         Properties serverConfig = new Properties();
         serverConfig.put(ENABLE_REQUEST_LOG, enableRequestLog);
