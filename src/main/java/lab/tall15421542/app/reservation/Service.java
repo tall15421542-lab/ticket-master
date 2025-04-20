@@ -34,6 +34,8 @@ public class Service {
                         .longOpt("state-dir").hasArg().desc("The directory for state storage").build())
                 .addOption(Option.builder("c")
                         .longOpt("config").hasArg().desc("Config file path").required().build())
+                .addOption(Option.builder("sc")
+                        .longOpt("stream-config").hasArg().desc("Stream config file path").build())
                 .addOption(Option.builder("h")
                         .longOpt("help").hasArg(false).desc("Show usage information").build());
 
@@ -46,6 +48,7 @@ public class Service {
 
         final String stateDir = cl.getOptionValue("state-dir", "/tmp/kafka-streams");
         final String configFile = cl.getOptionValue("config");
+        final String streamConfigFile = cl.getOptionValue("stream-config", "");
 
         Properties config = Utils.readConfig(configFile);
         Schemas.configureSerdes(config);
@@ -53,12 +56,17 @@ public class Service {
         final Topology topology = createTopology();
         System.out.println(topology.describe());
 
-        config.setProperty(StreamsConfig.APPLICATION_ID_CONFIG, "reservation-service");
-        config.setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-        config.setProperty(StreamsConfig.STATE_DIR_CONFIG, stateDir);
-        config.setProperty(StreamsConfig.METRICS_RECORDING_LEVEL_CONFIG, "DEBUG");
+        Properties streamConfig = new Properties();
+        streamConfig.putAll(config);
+        if(!streamConfigFile.equals("")){
+            streamConfig.putAll(Utils.readConfig(streamConfigFile));
+        }
+        streamConfig.setProperty(StreamsConfig.APPLICATION_ID_CONFIG, "reservation-service");
+        streamConfig.setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        streamConfig.setProperty(StreamsConfig.STATE_DIR_CONFIG, stateDir);
+        streamConfig.setProperty(StreamsConfig.METRICS_RECORDING_LEVEL_CONFIG, "DEBUG");
 
-        KafkaStreams streams = new KafkaStreams(topology, config);
+        KafkaStreams streams = new KafkaStreams(topology, streamConfig);
         streams.start();
 
         addShutdownHookAndBlock(() -> streams.close());
