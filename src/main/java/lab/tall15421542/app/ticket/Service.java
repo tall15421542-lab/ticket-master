@@ -1,5 +1,10 @@
 package lab.tall15421542.app.ticket;
 
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.context.Context;
+import io.opentelemetry.context.Scope;
 import io.opentelemetry.instrumentation.annotations.SpanAttribute;
 import io.opentelemetry.instrumentation.annotations.WithSpan;
 import jakarta.ws.rs.*;
@@ -59,18 +64,27 @@ import static org.glassfish.jersey.CommonProperties.USE_VIRTUAL_THREADS;
 
 @Path("v1")
 public class Service extends Application {
+    class AsyncResponseWithMetadata {
+        AsyncResponse asyncResponse;
+        Context spanContext;
+        AsyncResponseWithMetadata(AsyncResponse asyncResponse, Context spanContext){
+            this.asyncResponse = asyncResponse;
+            this.spanContext = spanContext;
+        }
+    }
     Producer<String, CreateEvent> createEventProducer;
     Producer<String, CreateReservation> createReservationProducer;
     private String hostname;
     private int port;
     KafkaStreams streams;
-    final Map<String, AsyncResponse> outstandingRequests = new ConcurrentHashMap<>();
+    final Map<String, AsyncResponseWithMetadata> outstandingRequests = new ConcurrentHashMap<>();
     final Client client = ClientBuilder.newBuilder().register(JacksonFeature.class).build();
     Server server;
     ExecutorService virtualExecutor = Executors.newVirtualThreadPerTaskExecutor();
     final static Logger logger = LoggerFactory.getLogger(Service.class);
     final static String ENABLE_REQUEST_LOG = "enable.request.log";
     final static String MAX_THREADS = "max.threads";
+    private final Tracer tracer = GlobalOpenTelemetry.getTracer("ticket-service");;
 
     public Service(String hostname, int port){
         this.hostname = hostname;
@@ -230,10 +244,17 @@ public class Service extends Application {
                         .withValueSerde(Schemas.Stores.RESERVATION.valueSerde()));
 
         reservationTable.toStream().foreach((reservationId, reservation) -> {
-            final AsyncResponse asyncResponse = outstandingRequests.remove(reservationId);
+            final AsyncResponseWithMetadata asyncResponseWithMetadata = outstandingRequests.remove(reservationId);
+            final AsyncResponse asyncResponse = asyncResponseWithMetadata.asyncResponse;
+            final Context spanContext = asyncResponseWithMetadata.spanContext;
             if (asyncResponse != null && asyncResponse.isSuspended()) {
                 virtualExecutor.submit(()-> {
-                    asyncResponse.resume(ReservationBean.fromAvro(reservation));
+                    Span span = tracer.spanBuilder("async-handle-reservation").setParent(spanContext).startSpan();
+                    try (Scope ignored = span.makeCurrent()) {
+                        asyncResponse.resume(ReservationBean.fromAvro(reservation));
+                    } finally {
+                        span.end();
+                    }
                 });
             }
         });
@@ -341,7 +362,7 @@ public class Service extends Application {
     private void fetchReservationFromLocal(@SpanAttribute("reservation_id") String reservationId, AsyncResponse asyncResponse){
         Reservation reservation = reservationStore().get(reservationId);
         if(reservation == null){
-            outstandingRequests.put(reservationId, asyncResponse);
+            outstandingRequests.put(reservationId, new AsyncResponseWithMetadata(asyncResponse, Context.current()));
 
             // Ensure reservation does not arrive just after null check but before putting the request to outstandingRequest.
             reservation = reservationStore().get(reservationId);
