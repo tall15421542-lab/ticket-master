@@ -29,7 +29,10 @@ services:
     environment:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
       - OTEL_SERVICE_NAME=reservation-service
-    command: ["lab.tall15421542.app.reservation.Service", "-c", "appConfig/client.docker.properties"]
+    command: ["lab.tall15421542.app.reservation.Service", 
+      "-c", "appConfig/client.docker.properties",
+      "-sc", "appConfig/reservation-service/stream.properties"
+    ]
     depends_on:
       init-kafka:
         condition: service_completed_successfully
