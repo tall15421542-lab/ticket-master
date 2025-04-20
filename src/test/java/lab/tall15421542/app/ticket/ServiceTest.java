@@ -50,11 +50,12 @@ import java.util.function.Supplier;
 import static io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static lab.tall15421542.app.ticket.Service.ENABLE_REQUEST_LOG;
 import static org.junit.jupiter.api.Assertions.*;
 
 @Testcontainers
 class ServiceTest {
-    private final Client client = ClientBuilder.newBuilder().register(JacksonFeature.class).build();
+    private static final Client client = ClientBuilder.newBuilder().register(JacksonFeature.class).build();
     private static final Logger log = LoggerFactory.getLogger(ServiceTest.class);
 
     private static Service service1;
@@ -101,7 +102,7 @@ class ServiceTest {
         props1.setProperty(StreamsConfig.STATE_DIR_CONFIG, "./tmp-test/1");
         props1.setProperty(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, "20");
         Properties serverConfig1 = new Properties();
-        serverConfig1.put(Service.ENABLE_REQUEST_LOG, true);
+        serverConfig1.put(ENABLE_REQUEST_LOG, true);
         serverConfig1.put(Service.MAX_THREADS, 0);
         service1 = new Service("localhost", port1);
         service1.start(props1, props1, serverConfig1);
@@ -111,7 +112,7 @@ class ServiceTest {
         props2.setProperty(StreamsConfig.STATE_DIR_CONFIG, "./tmp-test/2");
         props2.setProperty(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, "20");
         Properties serverConfig2 = new Properties();
-        serverConfig2.put(Service.ENABLE_REQUEST_LOG, true);
+        serverConfig2.put(ENABLE_REQUEST_LOG, true);
         serverConfig2.put(Service.MAX_THREADS, 0);
         service2 = new Service("localhost", port2);
         service2.start(props2, props2, serverConfig2);
@@ -152,8 +153,33 @@ class ServiceTest {
                 Schemas.Topics.STATE_USER_RESERVATION.valueSerde().serializer()
         );
 
-        //TODO: add health check to ensure service is ready.
+        health_check();
     }
+
+    static void health_check(){
+        RetryConfig retryConfig = RetryConfig.<Response>custom()
+                .maxAttempts(20)
+                .waitDuration(Duration.ofSeconds(5))
+                .retryOnResult(resp -> resp.getStatus() >= 500)
+                .build();
+
+        Retry retry = Retry.of("test-health-check-retry", retryConfig);
+
+        Invocation.Builder request1 = client.target(String.format("http://localhost:%d/v1/health_check", port1)).request(MediaType.APPLICATION_JSON);
+        Supplier<Response> firstHealthCheckSupplier = Retry.decorateSupplier(retry, () -> request1.get());
+
+        Response response1 = firstHealthCheckSupplier.get();
+        assertNotNull(response1);
+        assertEquals(200, response1.getStatus());
+
+        Invocation.Builder request2 = client.target(String.format("http://localhost:%d/v1/health_check", port1)).request(MediaType.APPLICATION_JSON);
+        Supplier<Response> secondHealthCheckSupplier = Retry.decorateSupplier(retry, () -> request2.get());
+
+        Response response2 = secondHealthCheckSupplier.get();
+        assertNotNull(response1);
+        assertEquals(200, response2.getStatus());
+    }
+
 
     @Test
     void createEvent() throws InterruptedException {
@@ -347,23 +373,13 @@ class ServiceTest {
         }
     }
 
-    @Test
-    void health_check(){
-        Invocation.Builder request1 = client.target(String.format("http://localhost:%d/v1/health_check", port1)).request();
-        Response response1 = request1.get();
-        assertEquals(200, response1.getStatus());
-
-        Invocation.Builder request2 = client.target(String.format("http://localhost:%d/v1/health_check", port2)).request();
-        Response response2 = request2.get();
-        assertEquals(200, response2.getStatus());
-    }
-
     @AfterAll
     static void close() throws Exception {
         createEventKafkaConsumer.close();
         createReservationKafkaConsumer.close();
         reservationKafkaProducer.close();
         service1.close();
+        service2.close();
         FileUtils.deleteDirectory(new File("./tmp-test"));
     }
 }

@@ -245,9 +245,13 @@ public class Service extends Application {
 
         reservationTable.toStream().foreach((reservationId, reservation) -> {
             final AsyncResponseWithMetadata asyncResponseWithMetadata = outstandingRequests.remove(reservationId);
+            if(asyncResponseWithMetadata == null){
+                return;
+            }
+
             final AsyncResponse asyncResponse = asyncResponseWithMetadata.asyncResponse;
             final Context spanContext = asyncResponseWithMetadata.spanContext;
-            if (asyncResponse != null && asyncResponse.isSuspended()) {
+            if (asyncResponse.isSuspended()) {
                 virtualExecutor.submit(()-> {
                     Span span = tracer.spanBuilder("async-handle-reservation").setParent(spanContext).startSpan();
                     try (Scope ignored = span.makeCurrent()) {
