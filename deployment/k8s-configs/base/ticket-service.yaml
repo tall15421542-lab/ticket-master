@@ -41,6 +41,10 @@ spec:
             value: 'opentelemetry'
           - name: OTEL_EXPORTER_OTLP_ENDPOINT
             value: "http://$(OTEL_COLLECTOR_NAME).$(OTEL_COLLECTOR_NAMESPACE).svc.cluster.local:4318"   
+          - name: OTEL_TRACES_SAMPLER
+            value: 'parentbased_traceidratio'
+          - name: OTEL_TRACES_SAMPLER_ARG
+            value: '0.1'
           - name: POD_IP
             valueFrom:
               fieldRef:
