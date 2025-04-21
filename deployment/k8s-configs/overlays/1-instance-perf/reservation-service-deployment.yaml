@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reservation-service-deployment
+  labels:
+    app: reservation-service 
+spec:
+  replicas: 1 
+  template:
+    metadata:
+      labels:
+        app: reservation-service 
+    spec:
+      containers:
+        - name: reservation-service
+          resources:
+            requests:
+              memory: "2G"
+              cpu: "500m"
+
