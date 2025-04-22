@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ticket-service-deployment
+  labels:
+    app: ticket-service 
+spec:
+  replicas: 2 
+  template:
+    metadata:
+      labels:
+        app: ticket-service 
+    spec:
+      containers:
+        - name: ticket-service
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: "-Xmx6554m -Xms6554m -XX:+AlwaysPreTouch"
+            - name: OTEL_TRACES_SAMPLER_ARG
+              value: '0.05'
+          resources:
+            requests:
+              memory: "8G"
+              cpu: "4000m"
