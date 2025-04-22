@@ -49,7 +49,7 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: status.podIP
-        command: ["java", "-javaagent:/opentelemetry-javaagent.jar","-Djava.security.manager=allow", "-XX:+UseZGC", "-cp", "app.jar"]
+        command: ["java", "-javaagent:/opentelemetry-javaagent.jar","-Djava.security.manager=allow", "-XX:+UseZGC", "-XX:+ZGenerational", "-cp", "app.jar"]
         args: ["lab.tall15421542.app.ticket.Service", 
           "-c", "config/client.properties", 
           "-p", "8080", 
