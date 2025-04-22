@@ -10,6 +10,7 @@ services:
       - OTEL_SERVICE_NAME=ticket-service
       - OTEL_TRACES_SAMPLER=parentbased_traceidratio
       - OTEL_TRACES_SAMPLER_ARG=0.2
+      - JAVA_TOOL_OPTIONS=-Xmx2G -Xms2G -XX:+AlwaysPreTouch -XX:+UseZGC -XX:+ZGenerational
     command: ["lab.tall15421542.app.ticket.Service", 
       "-c", "appConfig/client.docker.properties", 
       "-p", "8080", 
