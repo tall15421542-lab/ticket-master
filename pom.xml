@@ -16,7 +16,7 @@
 
     <!-- dependencies version -->
     <avro.version>1.12.0</avro.version>
-    <jersey.version>3.1.9</jersey.version>
+    <jersey.version>4.0.0-M2</jersey.version>
     <jetty.version>12.0.17</jetty.version>
     <kafka.version>3.9.0</kafka.version>
     <slf4j.version>2.0.16</slf4j.version>
@@ -76,6 +76,21 @@
       <artifactId>jetty-util</artifactId>
       <version>${jetty.version}</version>
     </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-client</artifactId>
+      <version>${jetty.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty.http2</groupId>
+      <artifactId>jetty-http2-client</artifactId>
+      <version>${jetty.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty.http2</groupId>
+      <artifactId>jetty-http2-client-transport</artifactId>
+      <version>${jetty.version}</version>
+    </dependency>
 
     <!-- Jersey Dependencies -->
     <dependency>
@@ -103,6 +118,21 @@
     <dependency>
       <groupId>org.glassfish.jersey.containers</groupId>
       <artifactId>jersey-container-servlet-core</artifactId>
+      <version>${jersey.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.glassfish.jersey.connectors</groupId>
+      <artifactId>jersey-jetty-connector</artifactId>
+      <version>${jersey.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.glassfish.jersey.core</groupId>
+      <artifactId>jersey-client</artifactId>
+      <version>${jersey.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.glassfish.jersey.core</groupId>
+      <artifactId>jersey-common</artifactId>
       <version>${jersey.version}</version>
     </dependency>
 

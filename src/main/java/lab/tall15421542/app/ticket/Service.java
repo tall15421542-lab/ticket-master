@@ -13,10 +13,8 @@ import jakarta.ws.rs.client.ClientBuilder;
 import jakarta.ws.rs.container.AsyncResponse;
 import jakarta.ws.rs.container.CompletionCallback;
 import jakarta.ws.rs.container.Suspended;
-import jakarta.ws.rs.core.Application;
-import jakarta.ws.rs.core.GenericType;
-import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.*;
 import lab.tall15421542.app.avro.event.CreateEvent;
 import lab.tall15421542.app.avro.reservation.CreateReservation;
 import lab.tall15421542.app.avro.reservation.Reservation;
@@ -43,12 +41,18 @@ import org.apache.kafka.streams.state.HostInfo;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.QueryableStoreTypes;
 import org.apache.kafka.streams.state.ReadOnlyKeyValueStore;
+import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.ee10.servlet.ServletContextHandler;
 import org.eclipse.jetty.ee10.servlet.ServletHolder;
+import org.eclipse.jetty.http2.client.HTTP2Client;
+import org.eclipse.jetty.http2.client.transport.HttpClientTransportOverHTTP2;
 import org.eclipse.jetty.http2.server.HTTP2CServerConnectionFactory;
 import org.eclipse.jetty.server.*;
 import org.eclipse.jetty.util.thread.VirtualThreadPool;
+import org.glassfish.jersey.client.ClientConfig;
 import org.glassfish.jersey.jackson.JacksonFeature;
+import org.glassfish.jersey.jetty.connector.JettyConnectorProvider;
+import org.glassfish.jersey.jetty.connector.JettyHttpClientSupplier;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.servlet.ServletContainer;
 import org.slf4j.Logger;
@@ -78,7 +82,7 @@ public class Service extends Application {
     private int port;
     KafkaStreams streams;
     final Map<String, AsyncResponseWithMetadata> outstandingRequests = new ConcurrentHashMap<>();
-    final Client client = ClientBuilder.newBuilder().register(JacksonFeature.class).build();
+    Client httpClient;
     Server server;
     ExecutorService virtualExecutor = Executors.newVirtualThreadPerTaskExecutor();
     final static Logger logger = LoggerFactory.getLogger(Service.class);
@@ -89,6 +93,30 @@ public class Service extends Application {
     public Service(String hostname, int port){
         this.hostname = hostname;
         this.port = port;
+
+        this.httpClient = createHttpClient();
+    }
+
+    public Client createHttpClient(){
+        HttpClient jettyHTTP2Client = createJettyHTTP2Client();
+
+        ClientConfig clientConfig = new ClientConfig()
+                .connectorProvider(new JettyConnectorProvider())
+                .register(new JettyHttpClientSupplier(jettyHTTP2Client));
+        return ClientBuilder.newBuilder().register(JacksonFeature.class).withConfig(clientConfig).build();
+    }
+
+    public static HttpClient createJettyHTTP2Client() {
+        HTTP2Client http2Client = new HTTP2Client();
+        http2Client.setInitialSessionRecvWindow(64 * 1024 * 1024);
+
+        HttpClientTransportOverHTTP2 transport = new HttpClientTransportOverHTTP2(http2Client);
+
+        HttpClient client = new HttpClient(transport);
+        VirtualThreadPool threadPool = new VirtualThreadPool();
+        client.setExecutor(threadPool);
+
+        return client;
     }
 
     public static void main(final String[] args) throws Exception {
@@ -182,6 +210,7 @@ public class Service extends Application {
         this.streams.close();
         this.server.stop();
         this.server.join();
+        this.httpClient.close();
         logger.info("Outstanding Requests: {}", outstandingRequests);
     }
 
@@ -383,7 +412,7 @@ public class Service extends Application {
     private void fetchReservationFromOtherHost(HostInfo hostForKey, String reservationId, AsyncResponse asyncResponse) {
         final String path = "http://" + hostForKey.host() + ":" + hostForKey.port() + "/v1/reservation/" + reservationId;
         try {
-            final ReservationBean reservationBean = client.target(path)
+            final ReservationBean reservationBean = httpClient.target(path)
                     .request(MediaType.APPLICATION_JSON_TYPE)
                     .get(new GenericType<ReservationBean>() {
                     });
