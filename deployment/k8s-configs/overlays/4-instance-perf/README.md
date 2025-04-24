@@ -1,4 +1,4 @@
-# Performance Test Report
+# Perfomance Test Report
 
 ## Setting
 * **Application Version**: [v0.0.21](https://github.com/tall15421542-lab/ticket-master/tree/v0.0.21)
@@ -26,14 +26,14 @@
 
 ## Testing Flow
 **1. Warm Up Services**
-* Services warmed up until 200,000 concurrent ticket reservation requests consistently kept CPU usage under 25% for each pods.
+* Services warmed up until 66,666 concurrent ticket reservation requests consistently kept CPU usage under 25% for each pods.
 
 **2. Spike Test Execution**
 * Run 
     * 200,000 concurrent reservation requests.
     * 250,000 concurrent reservation requests.
     * 350,000 concurrent reservation requests.
-* Event with 40 areas, each area has 400 seats. The seats are arranged in a random, continuous fashion.
+* Event with 40 areas, each area has 400 seats. The seats are arranged in a random continuous fashion.
 
 **3. Metric Collection**
 * Latency and trace metrics collected from both client and server perspectives.
@@ -119,6 +119,12 @@
 | 4th round | 30,529           | 0.005   | 2.074   | 4.504   | 0%          |
 | 5th round | 31,002           | 0.005   | 2.405   | 3.639   | 0%          |
 | **Avg**   | **30,668**       | **0.005** | **2.471** | **3.713** | **0%** |
+
+## Conclusion
+1. For 200,000 concurrent requests, each pod serves approximately 50,000 concurrent requests with only 35% processing time for p90 and p95 compared to [two instances test](https://github.com/tall15421542-lab/ticket-master/tree/main/deployment/k8s-configs/overlays/2-instance-perf-with-jetty-client#-server-trace-sampled). 
+2. For 350,000 concurrent requests, each pod served 87,500 concurrent requests with only 55% — 60% processing time for p90 and p95 compared to [two instances test](https://github.com/tall15421542-lab/ticket-master/tree/main/deployment/k8s-configs/overlays/2-instance-perf-with-jetty-client#-server-trace-sampled). P50 took only 5ms, which is 500% faster. 
+3. These results indicate that the client machine (load generator) might be a bottleneck. We observed improved server-side latency with a more powerful client instance, likely due to reduced network I/O wait time and better concurrency handling on the client side. 
+4. Traces spanned over 40 seconds, indicating that the load was not applied in a tight enough time window to fully stress the system at once. Additionally, maximum CPU utilization remained around 35%, and memory usage peaked at 27%, suggesting the bottleneck may not be on the client resource. Instead, HTTP/2 client configuration (e.g., max streams, connection pooling) may limit actual concurrency levels.
 
 
 ## Note: JVM Warm-Up
