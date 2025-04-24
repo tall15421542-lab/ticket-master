@@ -10,9 +10,9 @@ steps:
     secretEnv:
       - TC_CLOUD_TOKEN
   - name: 'docker'
-    args: [ 'build', '-t', 'asia-east1-docker.pkg.dev/ticket-master-tall15421542/ticket-master/service', '.' ]
+    args: [ 'build', '-t', 'asia-east1-docker.pkg.dev/ticket-master-tall15421542/ticket-master/service:${TAG_NAME}', '.' ]
 
-images: [ 'asia-east1-docker.pkg.dev/ticket-master-tall15421542/ticket-master/service' ]
+images: [ 'asia-east1-docker.pkg.dev/ticket-master-tall15421542/ticket-master/service:${TAG_NAME}' ]
 availableSecrets:
   secretManager:
     - versionName: projects/ticket-master-tall15421542/secrets/TC_CLOUD_TOKEN/versions/latest
