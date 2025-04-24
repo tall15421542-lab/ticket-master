@@ -88,6 +88,8 @@ public class Service extends Application {
     final static Logger logger = LoggerFactory.getLogger(Service.class);
     final static String ENABLE_REQUEST_LOG = "enable.request.log";
     final static String MAX_THREADS = "max.threads";
+    final static String JETTY_SELECTORS = "jetty.selectors";
+    final static String JETTY_ACCEPTORS= "jetty.acceptors";
     private final Tracer tracer = GlobalOpenTelemetry.getTracer("ticket-service");;
 
     public Service(String hostname, int port){
@@ -136,7 +138,11 @@ public class Service extends Application {
                 .addOption(Option.builder("sc")
                         .longOpt("stream-config").hasArg().desc("Stream config file path").build())
                 .addOption(Option.builder("r")
-                        .longOpt("request-logging").hasArg(false).desc("Enable request log").build());
+                        .longOpt("request-logging").hasArg(false).desc("Enable request log").build())
+                .addOption(Option.builder("s")
+                    .longOpt("selectors").hasArg().desc("Jetty selectors").build())
+                .addOption(Option.builder("a")
+                    .longOpt("acceptors").hasArg().desc("Jetty acceptors").build());
 
         final CommandLine cl;
         try{
@@ -161,6 +167,8 @@ public class Service extends Application {
         final String streamConfigFile = cl.getOptionValue("stream-config", "");
         final int maxThreads = Integer.parseInt(cl.getOptionValue("max-threads", "0"));
         final boolean enableRequestLog = cl.hasOption("request-logging");
+        final int jettySelectors = Integer.parseInt(cl.getOptionValue("selectors", "-1"));
+        final int jettyAcceptors = Integer.parseInt(cl.getOptionValue("acceptors", "-1"));
 
         Properties baseConfig = Utils.readConfig(configFile);
         Schemas.configureSerdes(baseConfig);
@@ -184,6 +192,8 @@ public class Service extends Application {
         Properties serverConfig = new Properties();
         serverConfig.put(ENABLE_REQUEST_LOG, enableRequestLog);
         serverConfig.put(MAX_THREADS, maxThreads);
+        serverConfig.put(JETTY_SELECTORS, jettySelectors);
+        serverConfig.put(JETTY_ACCEPTORS, jettyAcceptors);
         service.start(streamConfig, producerConfig, serverConfig);
 
         addShutdownHookAndBlock(() -> {
@@ -487,7 +497,10 @@ public class Service extends Application {
 
         httpConfig.setNotifyRemoteAsyncErrors(false);
 
-        ServerConnector connector = new ServerConnector(jettyServer, http11, h2c);
+        // -1 indicates use default value.
+        int acceptors = (int)config.getOrDefault(JETTY_ACCEPTORS, -1);
+        int selectors = (int)config.getOrDefault(JETTY_SELECTORS, -1);
+        ServerConnector connector = new ServerConnector(jettyServer, acceptors, selectors, http11, h2c);
         connector.setPort(port);
         jettyServer.addConnector(connector);
 
