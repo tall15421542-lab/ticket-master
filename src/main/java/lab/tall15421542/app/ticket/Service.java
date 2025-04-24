@@ -419,7 +419,8 @@ public class Service extends Application {
         }
     }
 
-    private void fetchReservationFromOtherHost(HostInfo hostForKey, String reservationId, AsyncResponse asyncResponse) {
+    @WithSpan
+    private void fetchReservationFromOtherHost(HostInfo hostForKey, @SpanAttribute("reservation_id") String reservationId, AsyncResponse asyncResponse) {
         final String path = "http://" + hostForKey.host() + ":" + hostForKey.port() + "/v1/reservation/" + reservationId;
         try {
             final ReservationBean reservationBean = httpClient.target(path)
