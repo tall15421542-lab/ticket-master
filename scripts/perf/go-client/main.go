@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"math"
@@ -87,9 +88,13 @@ type Area struct {
 	ColCount int    `json:"colCount"`
 }
 
-var client *http.Client
+var clients []*http.Client
 var eventId = "event-" + uuid.NewString()
 var logger *zap.SugaredLogger
+
+func getClient() *http.Client {
+	return clients[rand.Int()%len(clients)]
+}
 
 func createEvent(host string, numOfAreas int) (*Event, error) {
 	url := fmt.Sprintf("http://%s/v1/event", host)
@@ -121,7 +126,7 @@ func createEvent(host string, numOfAreas int) (*Event, error) {
 
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := client.Do(req)
+	resp, err := getClient().Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("Error sending requests: %w", err)
 	}
@@ -160,7 +165,7 @@ func createReservation(host string, createReservationReq CreateReservation) (str
 
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := client.Do(req)
+	resp, err := getClient().Do(req)
 	if err != nil {
 		return "", &result, fmt.Errorf("Error sending requests: %w", err)
 	}
@@ -189,7 +194,7 @@ func getReservation(host string, reservationId string) (*Reservation, *httpstat.
 		return nil, nil, err
 	}
 
-	resp, err := client.Do(req)
+	resp, err := getClient().Do(req)
 	if err != nil {
 		return nil, nil, fmt.Errorf("Error sending request: %w", err)
 	}
@@ -213,27 +218,53 @@ func getReservation(host string, reservationId string) (*Reservation, *httpstat.
 	return &reservation, &result, nil
 }
 
-func initHttpClient(enableHttp2 bool) *http.Client {
-	retryClient := retryablehttp.NewClient()
-	retryClient.RetryMax = 20
-	retryClient.Logger = SugaredLeveledLogger{logger: logger}
-
-	if enableHttp2 {
-		var protocols http.Protocols
-		protocols.SetUnencryptedHTTP2(true)
-		httpClient := &http.Client{
-			Transport: &http2.Transport{
-				AllowHTTP: true,
-				DialTLS: func(network, addr string, cfg *tls.Config) (net.Conn, error) {
-					return net.Dial(network, addr)
-				},
-			},
-		}
-		retryClient.HTTPClient = httpClient
+// pretouch to create the connection from the client to the host.
+func healthCheck(client *http.Client, host string) error {
+	url := fmt.Sprintf("http://%s/v1/health_check", host)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return err
 	}
 
-	client = retryClient.StandardClient() // *http.Client
-	return client
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("Error sending requests: %w", err)
+	}
+	defer resp.Body.Close()
+	io.Copy(io.Discard, resp.Body)
+	return nil
+}
+
+func initHttpClients(enableHttp2 bool, numOfClients int, host string) {
+	for i := 0; i < numOfClients; i = i + 1 {
+		retryClient := retryablehttp.NewClient()
+		retryClient.RetryMax = 20
+		retryClient.Logger = SugaredLeveledLogger{logger: logger}
+
+		if enableHttp2 {
+			var protocols http.Protocols
+			protocols.SetUnencryptedHTTP2(true)
+			httpClient := &http.Client{
+				Transport: &http2.Transport{
+					AllowHTTP: true,
+					DialTLS: func(network, addr string, cfg *tls.Config) (net.Conn, error) {
+						return net.Dial(network, addr)
+					},
+				},
+			}
+			retryClient.HTTPClient = httpClient
+		}
+
+		client := retryClient.StandardClient() // *http.Client
+		err := healthCheck(client, host)
+		if err != nil {
+			logger.Fatalf("host %s is not healthy: %w", host, err)
+		}
+
+		clients = append(clients, client)
+	}
 }
 
 type Result struct {
@@ -411,6 +442,12 @@ func main() {
 				Usage:   "Number of Areas",
 				Aliases: []string{"a"},
 			},
+			&cli.IntFlag{
+				Name:    "numOfClients",
+				Value:   1,
+				Usage:   "Number of clients",
+				Aliases: []string{"c"},
+			},
 			&cli.StringFlag{
 				Name:    "sleep",
 				Value:   "0s",
@@ -446,6 +483,7 @@ func main() {
 			enableHttp2 := cmd.Bool("http2")
 			timeOfSleep, _ := time.ParseDuration(cmd.String("sleep"))
 			numOfAreas := int(cmd.Int("numOfAreas"))
+			numOfClients := int(cmd.Int("numOfClients"))
 			env := cmd.String("env")
 
 			var zapLogger *zap.Logger
@@ -458,7 +496,7 @@ func main() {
 			defer zapLogger.Sync()
 			logger = zapLogger.Sugar()
 
-			initHttpClient(enableHttp2)
+			initHttpClients(enableHttp2, numOfClients, host)
 			resultChan := make(chan Result, numOfRequests)
 
 			event, err := createEvent(host, numOfAreas)
