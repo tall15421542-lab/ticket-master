@@ -16,6 +16,8 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"runtime"
+	"runtime/pprof"
 	"slices"
 	"strconv"
 	"sync"
@@ -471,6 +473,30 @@ func main() {
 				},
 			},
 
+			&cli.StringFlag{
+				Name:    "cpuprofile",
+				Value:   "",
+				Usage:   "write cpu profile to `file`",
+				Aliases: []string{"cpu"},
+			},
+			&cli.StringFlag{
+				Name:    "memprofile",
+				Value:   "",
+				Usage:   "write memory profile to `file`",
+				Aliases: []string{"mem"},
+			},
+			&cli.StringFlag{
+				Name:    "blockprofile",
+				Value:   "",
+				Usage:   "write block profile to `file`",
+				Aliases: []string{"block"},
+			},
+			&cli.StringFlag{
+				Name:    "lockprofile",
+				Value:   "",
+				Usage:   "write lock profile to `file`",
+				Aliases: []string{"lock"},
+			},
 			&cli.BoolFlag{
 				Name:  "http2",
 				Value: false,
@@ -485,6 +511,30 @@ func main() {
 			numOfAreas := int(cmd.Int("numOfAreas"))
 			numOfClients := int(cmd.Int("numOfClients"))
 			env := cmd.String("env")
+			cpuprofile := cmd.String("cpuprofile")
+			memprofile := cmd.String("memprofile")
+			blockprofile := cmd.String("blockprofile")
+			lockprofile := cmd.String("lockprofile")
+
+			if blockprofile != "" {
+				runtime.SetBlockProfileRate(1)
+			}
+
+			if lockprofile != "" {
+				runtime.SetMutexProfileFraction(1)
+			}
+
+			if cpuprofile != "" {
+				f, err := os.Create(cpuprofile)
+				if err != nil {
+					log.Fatal("could not create CPU profile: ", err)
+				}
+				defer f.Close() // error handling omitted for example
+				if err := pprof.StartCPUProfile(f); err != nil {
+					log.Fatal("could not start CPU profile: ", err)
+				}
+				defer pprof.StopCPUProfile()
+			}
 
 			var zapLogger *zap.Logger
 			if env == "dev" {
@@ -512,6 +562,40 @@ func main() {
 
 			createConcurrentRequests(host, event, numOfRequests, resultChan, timeOfSleep)
 			reportResults(numOfRequests, resultChan)
+
+			if memprofile != "" {
+				f, err := os.Create(memprofile)
+				if err != nil {
+					log.Fatal("could not create memory profile: ", err)
+				}
+				defer f.Close()
+				runtime.GC()
+				if err := pprof.Lookup("allocs").WriteTo(f, 0); err != nil {
+					log.Fatal("could not write memory profile: ", err)
+				}
+			}
+			if blockprofile != "" {
+				f, err := os.Create(blockprofile)
+				if err != nil {
+					log.Fatal("could not create blockory profile: ", err)
+				}
+				defer f.Close() // error handling omitted for example
+				runtime.GC()
+				if err := pprof.Lookup("block").WriteTo(f, 0); err != nil {
+					log.Fatal("could not write blockory profile: ", err)
+				}
+			}
+			if lockprofile != "" {
+				f, err := os.Create(lockprofile)
+				if err != nil {
+					log.Fatal("could not create lockory profile: ", err)
+				}
+				defer f.Close() // error handling omitted for example
+				runtime.GC()
+				if err := pprof.Lookup("mutex").WriteTo(f, 0); err != nil {
+					log.Fatal("could not write lockory profile: ", err)
+				}
+			}
 			return nil
 		},
 	}
