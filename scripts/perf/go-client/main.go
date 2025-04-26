@@ -274,11 +274,13 @@ type Result struct {
 	err         error
 	postStats   *httpstat.Result
 	getStats    *httpstat.Result
+	latency     time.Duration
 }
 
 func createConcurrentRequests(host string, event *Event, numOfRequests int, resultChan chan<- Result, timeOfSleep time.Duration) {
 	var wg sync.WaitGroup
 
+	testStartTime := time.Now()
 	for i := 0; i < numOfRequests; i = i + 1 {
 		wg.Add(1)
 		go func() {
@@ -293,6 +295,7 @@ func createConcurrentRequests(host string, event *Event, numOfRequests int, resu
 				Type:       "RANDOM",
 			}
 
+			startTime := time.Now()
 			reservationId, postStats, err := createReservation(host, req)
 			if err != nil {
 				resultChan <- Result{
@@ -300,6 +303,7 @@ func createConcurrentRequests(host string, event *Event, numOfRequests int, resu
 					err:         err,
 					postStats:   postStats,
 					getStats:    nil,
+					latency:     time.Since(startTime),
 				}
 				return
 			}
@@ -313,6 +317,7 @@ func createConcurrentRequests(host string, event *Event, numOfRequests int, resu
 					err:         err,
 					postStats:   postStats,
 					getStats:    getStats,
+					latency:     time.Since(startTime),
 				}
 				return
 			}
@@ -322,10 +327,12 @@ func createConcurrentRequests(host string, event *Event, numOfRequests int, resu
 				err:         nil,
 				postStats:   postStats,
 				getStats:    getStats,
+				latency:     time.Since(startTime),
 			}
 		}()
 	}
 	wg.Wait()
+	logger.Infof("The test is completed in {} second", time.Since(testStartTime).Seconds())
 }
 
 func reportResults(numOfRequests int, resultChan <-chan Result) {
@@ -335,6 +342,7 @@ func reportResults(numOfRequests int, resultChan <-chan Result) {
 	errResults := 0
 
 	var reservationStats []Result
+	var reservationLatency []time.Duration
 
 	for i := 0; i < numOfRequests; i = i + 1 {
 		result := <-resultChan
@@ -344,6 +352,7 @@ func reportResults(numOfRequests int, resultChan <-chan Result) {
 			continue
 		}
 		reservationStats = append(reservationStats, result)
+		reservationLatency = append(reservationLatency, result.latency)
 		reservation := result.reservation
 		logger.Debugln(reservation)
 
@@ -365,7 +374,7 @@ func reportResults(numOfRequests int, resultChan <-chan Result) {
 		}
 	}
 
-	reportResponseTimeStats(reservationStats)
+	reportResponseTimeStats(reservationStats, reservationLatency)
 	logger.Infoln("successful reservations:", successReservations)
 	logger.Infoln("failed reservations:", failedReservations)
 	logger.Infoln("err results:", errResults)
@@ -378,14 +387,18 @@ func reportResults(numOfRequests int, resultChan <-chan Result) {
 	logger.Infoln("Total reserved Seats: ", totalReservedSeats)
 }
 
-func reportResponseTimeStats(reservationStats []Result) {
+func reportResponseTimeStats(reservationStats []Result, reservationLatency []time.Duration) {
 	slices.SortFunc(reservationStats, func(r1 Result, r2 Result) int {
 		return cmp.Compare(getResponseTime(r1), getResponseTime(r2))
 	})
 
-	logger.Infoln("P50: ", getPercentileResult(reservationStats, 50), "ms")
-	logger.Infoln("P95: ", getPercentileResult(reservationStats, 95), "ms")
-	logger.Infoln("P99: ", getPercentileResult(reservationStats, 99), "ms")
+	slices.SortFunc(reservationLatency, func(t1 time.Duration, t2 time.Duration) int {
+		return cmp.Compare(t1.Milliseconds(), t2.Milliseconds())
+	})
+
+	logger.Infoln(getPercentileResult(reservationStats, reservationLatency, 50))
+	logger.Infoln(getPercentileResult(reservationStats, reservationLatency, 95))
+	logger.Infoln(getPercentileResult(reservationStats, reservationLatency, 99))
 }
 
 func getResponseTime(result Result) int64 {
@@ -400,9 +413,9 @@ func getResponseTime(result Result) int64 {
 	return time.Milliseconds()
 }
 
-func getPercentileResult(reservationStats []Result, percentileInt int) float64 {
+func getPercentileResult(reservationStats []Result, reservationLatency []time.Duration, percentileInt int) string {
 	if len(reservationStats) == 0 {
-		return 0
+		return "0 percentile is not support"
 	}
 
 	percentile := float64(percentileInt) / 100.
@@ -414,13 +427,21 @@ func getPercentileResult(reservationStats []Result, percentileInt int) float64 {
 	highIdx := int(math.Ceil(percentileIdx))
 
 	if lowIdx == highIdx {
-		return float64(getResponseTime(reservationStats[lowIdx]))
+		processingTime := float64(getResponseTime(reservationStats[lowIdx]))
+		latency := float64(reservationLatency[lowIdx].Milliseconds())
+		return fmt.Sprintf("P%d: Processing Time %f ms, Latency %f ms", percentileInt, processingTime, latency)
 	}
 
 	responseTime1 := getResponseTime(reservationStats[lowIdx])
 	responseTime2 := getResponseTime(reservationStats[highIdx])
 
-	return float64(responseTime1)*(float64(highIdx)-percentileIdx) + float64(responseTime2)*(percentileIdx-float64(lowIdx))
+	latency1 := reservationLatency[lowIdx].Milliseconds()
+	latency2 := reservationLatency[highIdx].Milliseconds()
+
+	processingTime := float64(responseTime1)*(float64(highIdx)-percentileIdx) + float64(responseTime2)*(percentileIdx-float64(lowIdx))
+	latency := float64(latency1)*(float64(highIdx)-percentileIdx) + float64(latency2)*(percentileIdx-float64(lowIdx))
+
+	return fmt.Sprintf("P%d: Processing Time %f ms, Latency %f ms", percentileInt, processingTime, latency)
 }
 
 func main() {
