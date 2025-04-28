@@ -123,9 +123,35 @@
 ## Conclusion
 1. For 200,000 concurrent requests, each pod serves approximately 50,000 concurrent requests with only 35% processing time for p90 and p95 compared to [two instances test](https://github.com/tall15421542-lab/ticket-master/tree/main/deployment/k8s-configs/overlays/2-instance-perf-with-jetty-client#-server-trace-sampled). 
 2. For 350,000 concurrent requests, each pod served 87,500 concurrent requests with only 55% — 60% processing time for p90 and p95 compared to [two instances test](https://github.com/tall15421542-lab/ticket-master/tree/main/deployment/k8s-configs/overlays/2-instance-perf-with-jetty-client#-server-trace-sampled). P50 took only 5ms, which is 500% faster. 
-3. These results indicate that the client machine (load generator) might be a bottleneck. We observed improved server-side latency with a more powerful client instance, likely due to reduced network I/O wait time and better concurrency handling on the client side. 
-4. Traces spanned over 40 seconds, indicating that the load was not applied in a tight enough time window to fully stress the system at once. Additionally, maximum CPU utilization remained around 35%, and memory usage peaked at 27%, suggesting the bottleneck may not be on the client resource. Instead, HTTP/2 client configuration (e.g., max streams, connection pooling) may limit actual concurrency levels.
+3. These results indicate that the client machine (load generator) might be a bottleneck. With `pprof`, I observed that the load-test code took a lot of time on mutex contention. Though `http.Client` can be used concurrently, `GetConn` acquires a mutex and has to be serialized at some point. With more goroutines acquiring the mutex, some requests have to wait longer, decreasing the effective concurrency the server has to handle. Reduced concurrency and the scaling ability of the architecture are the reasons observed latency is lower, but the completed time is longer, around 40 seconds.
+
+<img width="774" alt="截圖 2025-04-28 上午9 06 38" src="https://github.com/user-attachments/assets/c5fb0e94-fd2a-42af-bb55-33417b39d466" />
 
 
 ## Note: JVM Warm-Up
 JVM is a Just-In-Time (JIT) compiler, meaning it performs runtime optimization. Initial executions tend to be slower due to class loading, interpretation, and profiling. Warming up ensures the system runs under steady-state performance before actual load testing begins.
+
+## Note: HTTP/2 Flow Control
+
+HTTP/2 includes **built-in flow control**.  
+Each TCP connection **multiplexes multiple streams** (configured by the server via `MAX_CONCURRENT_STREAMS`).  
+The receiver maintains a **flow-control window** (buffer), initially set through the `SETTINGS_INITIAL_WINDOW_SIZE` field in the `SETTINGS` frame, and dynamically updated via `WINDOW_UPDATE` frames to regulate the sender's progress.
+
+Using `GODEBUG=http2debug=2`, I observed that the **GKE Gateway** configures:
+- `MAX_CONCURRENT_STREAMS` = **100**
+- `SETTINGS_INITIAL_WINDOW_SIZE` = **65535 bytes**
+
+Given that each **Reservation Response** is approximately **500 bytes**, the maximum in-flight data (~50,000 bytes) is **below** the window size limit.  
+Thus, **HTTP/2 flow control is not a significant cause** of the delayed request arrivals we observed.
+
+[ref: HTTP/2 Flow Control](https://medium.com/coderscorner/http-2-flow-control-77e54f7fd518)
+
+## Note: Increase the Effective Request Concurrency
+
+We can increase the **effective concurrent requests** by:
+1. **Increasing the number of HTTP clients** to reduce `GetConn` mutex contention.
+2. **Running multiple processes** to distribute the load generation.
+
+However, with these improvements, sending **400,000 requests** could **overwhelm and crash the server**.
+
+
