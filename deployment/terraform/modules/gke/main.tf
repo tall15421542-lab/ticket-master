@@ -12,11 +12,33 @@ resource "google_container_cluster" "default" {
     channel = "CHANNEL_STANDARD"
   }
 
+  private_cluster_config {
+    enable_private_nodes = true
+    enable_private_endpoint = false
+  }
+
   deletion_protection = false
 }
 
 data "google_container_cluster" "default" {
   name = google_container_cluster.default.name
+}
+
+resource "google_compute_router" "router" {
+  project = "ticket-master-tall15421542"
+  name    = "nat-router"
+  network = "default"
+  region  = "asia-east1"
+}
+
+module "cloud-nat" {
+  source                             = "terraform-google-modules/cloud-nat/google"
+  version                            = "~> 5.0"
+  project_id                         = "ticket-master-tall15421542"
+  region                             = "asia-east1"
+  router                             = google_compute_router.router.name
+  name                               = "nat-config"
+  source_subnetwork_ip_ranges_to_nat = "ALL_SUBNETWORKS_ALL_IP_RANGES"
 }
 
 resource "google_compute_subnetwork" "network-for-l7lb" {
@@ -49,4 +71,3 @@ resource "google_project_iam_member" "trace_agent" {
   role    = "roles/cloudtrace.agent"
   member  = "principal://iam.googleapis.com/projects/${data.google_project.default.number}/locations/global/workloadIdentityPools/${data.google_project.default.project_id}.svc.id.goog/subject/ns/opentelemetry/sa/opentelemetry-collector"
 }
-
