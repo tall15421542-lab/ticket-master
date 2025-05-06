@@ -1,0 +1,8 @@
+commonLabels:
+  variant: 40-instance-perf
+resources:
+- ../../base
+patches:
+- path: ticket-service-deployment.yaml
+- path: reservation-service-deployment.yaml
+- path: event-service-deployment.yaml
