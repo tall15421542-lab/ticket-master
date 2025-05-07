@@ -4,7 +4,7 @@
 
 - **Application Version**: [v0.0.21](https://github.com/tall15421542-lab/ticket-master/tree/v0.0.21)
 - **Spike Test Client**:  
-  - Code: [`main.go`](https://github.com/tall15421542-lab/ticket-master/blob/v0.0.22/scripts/perf/go-client/main.go)
+  - Code: [main.go](https://github.com/tall15421542-lab/ticket-master/blob/v0.0.22/scripts/perf/go-client/main.go)
 
   ```bash
   go run main.go --host 10.140.0.41 -a 100 -env prod --http2 -n 250000 -c 4 & \
@@ -55,11 +55,11 @@ Latency and trace metrics were collected from:
 - Client-side
 - Server-side (via OpenTelemetry)
 
----
+
 
 ## 📊 Test Results — 1,000,000 Concurrent Requests
 
-### ✅ Client-Observed Latency
+### ✅ Client-Observed Latency(Per request)
 
 | Round     | P50 (s) | P95 (s) | P99 (s) |
 |-----------|---------|---------|---------|
@@ -72,7 +72,7 @@ Latency and trace metrics were collected from:
 
 ---
 
-### 🔁 Client-Observed Latency (With Retries on 503)
+### 🔁 Client-Observed Latency (Including I/O and goroutine context switch)
 
 | Round     | P50 (s) | P95 (s) | P99 (s) |
 |-----------|---------|---------|---------|
@@ -148,11 +148,11 @@ Each service instance processed roughly:
 ---
 
 ### 2. Scalability Confirmed
-Compared to [16-instance test with 400,000 requests](https://github.com/tall15421542-lab/ticket-master/tree/main/deployment/k8s-configs/overlays/16-instance-perf#-testing-result---400000-concurrent-requests):
+Compared to [16-instance test with 400,000 requests](https://github.com/tall15421542-lab/ticket-master/tree/main/deployment/k8s-configs/overlays/16-instance-perf#-testing-result---400000-concurrent-requests)' Client-Observed Latency (Including I/O and goroutine context switch):
 
-- **P50 latency** increased by ~2.642 seconds
+- **P50 latency** increased by ~33%
 - **P95 latency** remained stable
-- **P99 latency** improved by ~1.5 seconds
+- **P99 latency** decrease by ~9%
 
 ➡️ This confirms **near-linear scalability** under heavier load.
 
@@ -174,9 +174,7 @@ This pattern reflects **real-world user behavior**:
 - Others send requests slightly later due to reaction or network delays.
 - The result is a natural distribution resembling a bell curve.
 
-This behavior is expected and realistic under high demand.
-- However, we can consider improvements:
-  - **More aggressive load testing**: Decrease the arrival window to increase burst pressure.
+However, we can consider **More aggressive load testing**: Decrease the arrival window to increase burst pressure.
 
 #### Event Service Behavior
 
