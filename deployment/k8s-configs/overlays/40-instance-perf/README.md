@@ -48,6 +48,7 @@ Generated 1,000,000 concurrent reservation requests for:
 - 4 events  
 - 100 areas per event  
 - 400 seats per area (random continuous seat selections)
+- **160,000 seats** in total
 
 ### 3. Metric Collection
 Latency and trace metrics were collected from:
@@ -82,7 +83,39 @@ Latency and trace metrics were collected from:
 | 5th round | 10.782  | 15.377  | 16.124  |
 | **Avg**   | **10.581** | **15.165** | **15.890** |
 
----
+### Spans graph
+
+#### POST /v1/event/{id}/reservation
+
+##### Span Rate
+![截圖 2025-05-07 上午11.15.57](https://hackmd.io/_uploads/S1ktxIOglg.png)
+
+##### Span Duration(Percentile)
+![截圖 2025-05-07 上午11.16.34](https://hackmd.io/_uploads/SyEseLdllg.png)
+
+#### GET /v1/reservation/{reservation_id}
+
+###### Span Rate
+![截圖 2025-05-07 上午11.15.23](https://hackmd.io/_uploads/Sy38xIdxel.png)
+
+##### Span Duration(Percentile)
+![截圖 2025-05-07 上午11.14.27](https://hackmd.io/_uploads/H1E7lLulex.png)
+
+#### Reservation service
+##### Span Rate
+![截圖 2025-05-07 上午11.47.12](https://hackmd.io/_uploads/ByAaw8ugee.png)
+
+##### Span Duration(Percentile)
+![截圖 2025-05-07 上午11.48.44](https://hackmd.io/_uploads/H1iX_Ldexe.png)
+
+##### Event Service
+
+##### Span Rate
+![截圖 2025-05-07 上午11.50.13](https://hackmd.io/_uploads/SkQFuLdllg.png)
+
+##### Span Duration(Percentile)
+![截圖 2025-05-07 上午11.51.12](https://hackmd.io/_uploads/BJ0nOIuelg.png)
+
 
 ### 📡 Server-Side Trace (Sampled)
 
@@ -125,10 +158,40 @@ Compared to [16-instance test with 400,000 requests](https://github.com/tall1542
 
 ---
 
-### 3. Significant improvement in throughput and latency
+### 3. 📊 Span Graph Analysis
+
+#### Reservation request distribution
+From the span graph, we observe that the arrival of reservation requests:
+
+```
+POST /v1/event/{id}/reservation
+```
+
+follows a **bell curve distribution** over approximately **15 seconds**. This indicates that clients **do not send 1 million requests all at once**.
+
+This pattern reflects **real-world user behavior**:
+- Some customers send requests as soon as ticket sales open.
+- Others send requests slightly later due to reaction or network delays.
+- The result is a natural distribution resembling a bell curve.
+
+This behavior is expected and realistic under high demand.
+- However, we can consider improvements:
+  - **More aggressive load testing**: Decrease the arrival window to increase burst pressure.
+
+#### Event Service Behavior
+
+- The **Event Service stops processing requests after about 7 seconds**.
+- This suggests the event is **sold out** within that time.
+- The Event Service then **broadcasts the sold-out state** to the **Reservation Service**.
+- After that, the Reservation Service begins to **immediately reject incoming reservations** without further processing.
+
+---
+
+### 4. Significant improvement in throughput and latency
 For 1,000,000 concurrent requests.
 - **50% of users**: completed in under **10 seconds**
 - **99% of users**: completed in under **16 seconds**
+- Event sold out within **7 seconds**
 
 ⚡ This is a significant improvement over the 5–20 minute delays reported in recent high-demand ticket sales events:
 This system is **18 to 75 times faster** than Ticketmaster in those scenarios.
