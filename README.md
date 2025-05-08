@@ -2,48 +2,64 @@
 
 ## Introduction
 
-**Ticket Master** is a high-performance ticket selling system capable of processing **[1,000,000 concurrent reservations within 15 seconds](https://github.com/tall15421542-lab/ticket-master/tree/main/deployment/k8s-configs/overlays/40-instance-perf)**.
+**Ticket Master** is a high-performance ticket selling system capable of processing **[1,000,000 reservations within 16 seconds](https://github.com/tall15421542-lab/ticket-master/tree/main/deployment/k8s-configs/overlays/40-instance-perf)**.
 
-The system leverages [Kafka Streams](https://kafka.apache.org/documentation/streams/), offering:
+The system is built upon [Kafka Streams](https://kafka.apache.org/documentation/streams/), offering:
 
 - **Exactly-once Processing Semantics**: Guarantees correctness and consistency of reservations.
-- **Horizontal Scalability**: Seamlessly scales with Kafka partitioning.
-- **Fault Tolerance**: Application state is backed up via changelogs in Kafka topics.
+- **Horizontal Scalability**: Seamlessly scales with Kafka topic partitions.
+- **Fault Tolerance**: Application state is backed up via changelogs topics in Kafka.
 
 The system adopts a microservices-based stream processing architecture, consisting of:
 
-- **Ticket Service**: Serves as the API gateway, receiving user requests.
-- **Reservation Service**: A Kafka Streams processor responsible for managing reservation logic and maintaining state.
-- **Event Service**: A Kafka Streams processor that handles event creation and real-time seat availability updates.
+- **Ticket Service**: API gateway, receive user requests and pass to Kafka.
+- **Reservation Service**: Kafka Streams app that processes reservations with state management.
+- **Event Service**: Kafka Streams app that manages event creation and seat availability.
 
 
 ## Infrastructure
-[Chart Link](https://drive.google.com/file/d/1_QCGj6DDKWuhazEUyqC6ExoQuQ7zbD1F/view?usp=sharing)
-![截圖 2025-05-07 下午4.45.27](https://hackmd.io/_uploads/H1D3pq_egx.png)
+[Architecture Diagram](https://drive.google.com/file/d/1_QCGj6DDKWuhazEUyqC6ExoQuQ7zbD1F/view?usp=sharing)
+![Architecture Diagram](https://hackmd.io/_uploads/H1D3pq_egx.png)
 
 ## Observability
 
 ### Traces
-We use [opentelemetry java agent](https://opentelemetry.io/docs/zero-code/java/agent/) with some manual instrumentation to record traces and spans.
-
-Traces and spans are sent to Google Cloud Trace through [opentelemetry collector](https://github.com/GoogleCloudPlatform/otlp-k8s-ingest).
+* Powered by [OpenTelemetry Java Agent](https://opentelemetry.io/docs/zero-code/java/agent/).
+* Collected via [OTLP Collector](https://github.com/GoogleCloudPlatform/otlp-k8s-ingest) and exported to Google Cloud Trace.
 
 ### Log
 Logs are written to standard output and collected using [GKE's native logging support](https://cloud.google.com/kubernetes-engine/docs/concepts/about-logs).
 
 ## Deployment
+### CI/CD Pipeline
+1. **Tag Push to GitHub**  
+2. **Trigger Cloud Build for Testing**  
+   Cloud Build is triggered by the tag push. It runs unit and integration tests using:
+   ```bash
+   mvn test
+   ```
+3. **Build and Push Docker Image**  
+   If all tests pass, Cloud Build builds a Docker image using the Git tag as the image version, then pushes it to **Artifact Registry**.
+
+
 ### Deploy
-1. Create the updated Kubernetes configuration under `overlays` directory([example](https://github.com/tall15421542-lab/ticket-master/tree/main/deployment/k8s-configs/overlays/40-instance-perf))
+1. (Optional) Create or update the Kubernetes overlay in `deployment/k8s-configs/overlays`([example](https://github.com/tall15421542-lab/ticket-master/tree/main/deployment/k8s-configs/overlays/40-instance-perf))
 2. (Optional) Overwrite [application config](https://github.com/tall15421542-lab/ticket-master/tree/main/deployment/k8s-configs/base/appConfig) under the newly created directory.
-3. `make deploy -e PARTITIONS_COUNT=40 -e PERF_TYPE=40-instance-perf`
-    * `PARTITIONS_COUNT`: number of partitions for topics.
-    * `PERF_TYPE`: the directory name of newly created directory.
+3. Run:
+```
+make deploy -e PARTITIONS_COUNT=40 -e PERF_TYPE=40-instance-perf
+```
+* `PARTITIONS_COUNT`: Number of partitions for Kafka topics.
+* `PERF_TYPE`: Name of overlay folder used in deployment.
 ### Destroy
-1. `make destroy -e PERF_TYPE=40-instance-perf`
-    * `PERF_TYPE`: the directory name of newly created directory.
+```
+make destroy -e PERF_TYPE=40-instance-perf
+```
+* `PERF_TYPE`: Name of overlay folder used in deployment.
+
 ## Load Test
 
-### Get gateway ip address
+### Get Gateway IP
 ```bash
 kubectl get gateway
 
@@ -51,9 +67,9 @@ NAME            CLASS                              ADDRESS         PROGRAMMED   
 external-http   gke-l7-regional-external-managed   35.206.193.99   True         14m
 internal-http   gke-l7-rilb                        10.140.0.41     True         14m
 ```
-We can perform load test either
-1. From our local computer, send requests to `external-http` ip address.
-2. Start a Google Compute Engine within the same VPC, send requests to `internal-http` ip address.
+You can run load test from:
+1. The Local machine, send requests to `external-http` ip address.
+2. The Google Compute Engine within the same VPC, send requests to `internal-http` ip address.
 
 ### Smoke Test
 The objective of smoke test is to
@@ -91,11 +107,11 @@ go run main.go --host [IP_ADDRESS] -a 100 -env prod --http2 -n 250000 -c 4
 * `-c`: number of http clients. It aims to solve [lock contention in high concurrency scenarios](https://github.com/tall15421542-lab/ticket-master/blob/main/deployment/k8s-configs/overlays/4-instance-perf/README.md#conclusion).
 
 ## Profiling
-### Java applications in the Kubernetes cluster
+### Java application in Kubernetes
 1. Get pod name by `kubectl get pods`.
 2. Enter the pod by `kubectl exec --stdin --tty [POD_NAME]  -- /bin/bash`
 3. Inside the pod:
-    1. Download java jdk by 
+    1. Download java jdk:
     ```
     wget https://download.oracle.com/java/24/latest/jdk-24_linux-x64_bin.deb
     dpkg -i jdk-24_linux-x64_bin.deb
@@ -110,27 +126,30 @@ kubectl cp [POD_NAME]:/tmp/recording.jfr recording.jfr --retries 999
 ```
 5. Open the JFR recording with [JDK Mission Control](https://www.oracle.com/java/technologies/jdk-mission-control.html)
 
-### Go spike test client
-1. Run spike test with the following options:
+### Go Client
+1. Run spike test with the following flags:
 ```
  --cpuprofile file, --cpu file      write cpu profile to file
  --memprofile file, --mem file      write memory profile to file
  --blockprofile file, --block file  write block profile to file
  --lockprofile file, --lock file    write lock profile to file
 ```
-2. Read profiling on the web `pprof -web [PROFILE_FILE_PATH]`.
+2. Visualize profiles:
+```
+pprof -web [PROFILE_FILE_PATH]
+```
 
 ## Local Development
 ### prerequisite
 * [Docker Desktop](https://www.docker.com/products/docker-desktop/)
 * [Java](https://www.oracle.com/tw/java/technologies/downloads/)
-* [Opentelemetry Java agent](https://opentelemetry.io/docs/zero-code/java/agent/getting-started/#setup): The following examples put the agent under `otel/` director.
+* [Opentelemetry Java agent](https://opentelemetry.io/docs/zero-code/java/agent/getting-started/#setup): The following examples put the agent under `otel/` directory.
 ### Local Infra
 ```
 docker compose up -d
 ```
 This would start
-* [Kafka KRaft cluster](https://developer.confluent.io/learn/kraft/)
+* [Kafka(KRaft mode)](https://developer.confluent.io/learn/kraft/)
 * [Schema Registry](https://github.com/confluentinc/schema-registry): RESTful interface for storing and retrieving Avro schemas.
 * [Jaeger](https://www.jaegertracing.io/): Distributed tracing observability platforms.
 * [Kafdrop](https://github.com/obsidiandynamics/kafdrop): Kafka Web UI for viewing Kafka topics and browsing consumer groups.
@@ -144,7 +163,7 @@ This would start
 ./mvnw test
 ```
 This command runs both unit and integration tests.
-For **loacl load test**, check [this section](#Load-Test).
+For **loacl load test**, see [Load Test](#Load-Test).
 
 ### Update Avro
 1. Add or Update `.avro` files under [./src/main/resources/avro](https://github.com/tall15421542-lab/ticket-master/tree/main/src/main/resources/avro)
@@ -158,19 +177,22 @@ The following properties can configured by setting environment cariables or via 
 * `OTEL_TRACES_SAMPLER_ARG`: Sampling rate described [here](https://opentelemetry.io/docs/languages/java/configuration/#properties-traces).
 
 ### Suggested JVM options
+```
+-XX:+UseZGC -XX:+ZGenerational -Xmx2G -Xms2G -XX:+AlwaysPreTouch
+```
 To minimize pause times and ensure low latency, we recommend using the [Z Garbage Collector](https://docs.oracle.com/en/java/javase/24/gctuning/z-garbage-collector.html).
 * `-XX:+UseZGC -XX:+ZGenerational`: Configure JVM to use zgc.
 * `-Xmx2G -Xms2G`: Setting the same value to reduce time for memory allocation.
-* `-XX:+AlwaysPreTouch`: page in memory before the application starts.
+* `-XX:+AlwaysPreTouch`: Page in memory before the application starts.
 
 ### Build
 ```bash
 ./mvnw clean package
 ```
-This command compile the source codes into an uber-jar using [maven-shade-plugin](https://maven.apache.org/plugins/maven-shade-plugin/index.html).
+Use [maven-shade-plugin](https://maven.apache.org/plugins/maven-shade-plugin/index.html) to build an uber-jar.
 
 ### Ticket Service
-```bash
+```
 java -javaagent:./otel/opentelemetry-javaagent.jar \
 -cp target/ticket-master-1.0-SNAPSHOT-shaded.jar \
 lab.tall15421542.app.ticket.Service -p 8080 -d ./tmp/ticket-service/ -n 0 \
