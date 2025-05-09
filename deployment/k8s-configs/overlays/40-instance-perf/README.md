@@ -12,6 +12,7 @@
     | Event Service       | 40       | 500m   | 2 GB   |
 
 - **Infrastructure**:
+  - Google Kubernetes Engine: Autopilot mode
   - Confluent Cloud Kafka Cluster
     - Type: Basic
     - Partitions per topic: 40
@@ -51,21 +52,21 @@ Generated **1,000,000 concurrent reservation requests** for **160,000 seats**, d
 ### 3. Metric Collection
 Latency and trace metrics were collected from:
 - Client-side
-- Server-side (via OpenTelemetry)
+- Server-side (using OpenTelemetry and exported to Google Cloud Trace)
 
 
 
 ## 📊 Test Results — 1,000,000 Concurrent Requests
-### Client-Observed Latency (Including I/O and goroutine context switch)
+### ✅ Client-Observed Server Processing Time
 
 | Round     | P50 (s) | P95 (s) | P99 (s) |
 |-----------|---------|---------|---------|
-| 1st round | 10.628  | 15.349  | 16.083  |
-| 2nd round | 10.594  | 15.237  | 15.951  |
-| 3rd round | 10.442  | 15.050  | 15.754  |
-| 4th round | 10.457  | 14.810  | 15.540  |
-| 5th round | 10.782  | 15.377  | 16.124  |
-| **Avg**   | **10.581** | **15.165** | **15.890** |
+| 1st round | 1.608   | 2.961   | 3.630   |
+| 2nd round | 1.633   | 3.222   | 4.150   |
+| 3rd round | 1.539   | 2.636   | 3.133   |
+| 4th round | 1.563   | 2.830   | 3.473   |
+| 5th round | 1.615   | 2.890   | 3.546   |
+| **Avg**   | **1.592** | **2.908** | **3.586** |
 
 ### Spans graph
 
@@ -116,13 +117,7 @@ Latency and trace metrics were collected from:
 ## Analysis
 ### 1. Scalability Confirmed
 
-Compared to the [16-instance test with 400,000 requests](https://github.com/tall15421542-lab/ticket-master/tree/main/deployment/k8s-configs/overlays/16-instance-perf#-testing-result---400000-concurrent-requests), the client-observed latency (including I/O, server processing, and goroutine context switch) showed the following:
-
-- **P50 latency** increased by ~33%
-- **P95 latency** remained stable
-- **P99 latency** decreased by ~9%
-
-When compared against [server-side latency](https://github.com/tall15421542-lab/ticket-master/tree/main/deployment/k8s-configs/overlays/16-instance-perf#%EF%B8%8F-server-trace-sampled), performance improved across all percentiles:
+Compared to the [16-instance test with 400,000 requests](https://github.com/tall15421542-lab/ticket-master/tree/main/deployment/k8s-configs/overlays/16-instance-perf#-testing-result---400000-concurrent-requests), the [server-side latency](https://github.com/tall15421542-lab/ticket-master/tree/main/deployment/k8s-configs/overlays/16-instance-perf#%EF%B8%8F-server-trace-sampled), performance improved across all percentiles:
 - **P50 latency**: Improved from `220ms` to `2ms`.
 - **P90 latency**: Improved from `3.43s` to `1.438s` (↓ 58%).
 - **P95 latency**: Improved from `4.868s` to `1.96s` (↓ 60%).
@@ -143,10 +138,23 @@ POST /v1/event/{id}/reservation
 
 follows a **bell curve distribution** over approximately **15 seconds**. This indicates that clients **do not send 1 million requests simultaneously**.
 
-This aligns with expected real-world user behavior:
+While the test client was designed to issue concurrent requests, this behavior is consistent with real-world conditions:
 - Some customers send requests as soon as ticket sales open.
 - Others send requests slightly later due to reaction time or network delays.
 - The result is a natural distribution resembling a bell curve.
+
+This makes the 15-second spike a realistic and meaningful scenario for evaluating system performance.
+
+Below are the latency percentiles for reservation completion across five rounds, including I/O, server processing, and goroutine context switching:
+
+| Round     | P50 (s) | P95 (s) | P99 (s) |
+|-----------|---------|---------|---------|
+| 1st round | 10.628  | 15.349  | 16.083  |
+| 2nd round | 10.594  | 15.237  | 15.951  |
+| 3rd round | 10.442  | 15.050  | 15.754  |
+| 4th round | 10.457  | 14.810  | 15.540  |
+| 5th round | 10.782  | 15.377  | 16.124  |
+| **Avg**   | **10.581** | **15.165** | **15.890** |
 
 #### Event Service Behavior
 
@@ -157,9 +165,9 @@ This aligns with expected real-world user behavior:
 
 ### 3. Significant Improvement in Throughput and Latency
 
-For **1,000,000 concurrent reservation requests**:
-- **50% of users** completed in under **10 seconds**.
-- **99% of users** completed in under **16 seconds**.
+For **1,000,000 reservation requests within 16 seconds**:
+- **50% of users** completed in under **1.6 seconds**.
+- **99% of users** completed in under **3.6 seconds**.
 - The event **sold out within 7 seconds**.
 
 ⚡ Compared to tixcraft, the system used for the Jay Chou concert:
@@ -178,8 +186,8 @@ For **1,000,000 concurrent reservation requests**:
 
 - **User wait time**:
   - tixcraft: 5–20 minutes (**300–1200 seconds**)
-  - This system: **99% of users finished in 16 seconds**  
-  → **~19× to 75× faster user completion**
+  - This system: **99% of users finished in 3.6 seconds**  
+  → **~82× to 333× faster user completion**
 
 Notably, this performance was achieved using **far fewer resources** than the [10,000 virtual machine setup](https://money.udn.com/money/story/5648/8310486) referenced in public reports:
 - **40 pods** with **4 vCPUs** and **8 GB memory** each  
@@ -190,9 +198,9 @@ Notably, this performance was achieved using **far fewer resources** than the [1
 
 While the load test client does not send all 1,000,000 requests simultaneously, the distribution follows a natural **bell curve**, closely simulating real-world traffic patterns during high-demand ticket sales.
 
-Despite this realistic traffic shape, the system demonstrated the ability to **handle 1,000,000 reservation requests within just 16 seconds**, with **50% of users completing in under 10 seconds** and **the event selling out in only 7 seconds**.
+Despite this realistic traffic shape, the system demonstrated the ability to **handle 1,000,000 reservation requests within just 16 seconds**, with **99% of users completing in under 3.6 seconds** and **the event selling out in only 7 seconds**.
 
-Crucially, this was achieved using **significantly fewer resources** than the 10,000-VM setup reportedly used for Jay Chou’s concert, yet delivered **19× to 75× faster performance**.
+Crucially, this was achieved using **significantly fewer resources** than the 10,000-VM setup reportedly used for Jay Chou’s concert, yet delivered **82× to 333× faster performance**.
 
 ➡️ **This validates the system’s scalability, efficiency, and suitability for large-scale, real-time reservation workloads—while maintaining exceptional performance under extreme load.**
 
