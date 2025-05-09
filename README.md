@@ -67,12 +67,12 @@ NAME            CLASS                              ADDRESS         PROGRAMMED   
 external-http   gke-l7-regional-external-managed   35.206.193.99   True         14m
 internal-http   gke-l7-rilb                        10.140.0.41     True         14m
 ```
-You can run load test from:
-1. The Local machine, send requests to `external-http` ip address.
-2. The Google Compute Engine within the same VPC, send requests to `internal-http` ip address.
+You can run a load test from:
+1. The Local machine sends requests to the `external-http` IP address.
+2. The Google Compute Engine within the same VPC, send requests to the `internal-http` IP address.
 
 ### Smoke Test
-The objective of smoke test is to
+The objective of the smoke test is to
 1. Verify that the setup is free of basic configuration or runtime errors.
 2. Allow the system to initialize and establish connections with Kafka and the Schema Registry.
 ```
@@ -82,9 +82,9 @@ k6 run smoke.js -e HOST_PORT=[IP_ADDRESS] -e NUM_OF_AREAS=40
 * `HOST_PORT`: IP address of ticket service(gateway address in kubernetes deployment).
 * `NUM_OF_AREAS`: Number of areas for each event.
 ### Stress Test
-The objective of stress test is to 
+The objective of the stress test is to 
 1. See the performance under high traffic over a specific duration.
-2. Warm up the components for spike test.
+2. Warm up the components for the spike test.
 
 ```
 # under scripts/perf/k6/ directory.
@@ -102,13 +102,13 @@ go run main.go --host [IP_ADDRESS] -a 100 -env prod --http2 -n 250000 -c 4
 * `--host`: IP address of ticket service(gateway address in kubernetes deployment).
 * `-a`: number of areas for this event.
 * `--env`: `prod` would dismiss the logging.
-* `--http2`: If present, would send traffic using http2.
+* `--http2`: If present, would send traffic using HTTP/2.
 * `-n`: number of concurrent requests.
-* `-c`: number of http clients. It aims to solve [lock contention in high concurrency scenarios](https://github.com/tall15421542-lab/ticket-master/blob/main/deployment/k8s-configs/overlays/4-instance-perf/README.md#conclusion).
+* `-c`: number of HTTP clients. It aims to solve [lock contention in high concurrency scenarios](https://github.com/tall15421542-lab/ticket-master/blob/main/deployment/k8s-configs/overlays/4-instance-perf/README.md#conclusion).
 
 ## Profiling
 ### Java application in Kubernetes
-1. Get pod name by `kubectl get pods`.
+1. Get the pod name by `kubectl get pods`.
 2. Enter the pod by `kubectl exec --stdin --tty [POD_NAME]  -- /bin/bash`
 3. Inside the pod:
     1. Download java jdk:
@@ -120,7 +120,7 @@ go run main.go --host [IP_ADDRESS] -a 100 -env prod --http2 -n 250000 -c 4
     ```
     jcmd 1 JFR.start duration=60s filename=/tmp/recording.jfr settings=/usr/lib/jvm/jdk-24.0.1-oracle-x64/lib/jfr/profile.jfc
     ```
-4. Download the recording file in the pod:
+4. Download the recording file from the pod:
 ```
 kubectl cp [POD_NAME]:/tmp/recording.jfr recording.jfr --retries 999
 ```
@@ -163,16 +163,16 @@ This would start
 ./mvnw test
 ```
 This command runs both unit and integration tests.
-For **loacl load test**, see [Load Test](#Load-Test).
+For **local load test**, see [Load Test](#Load-Test).
 
 ### Update Avro
 1. Add or Update `.avro` files under [./src/main/resources/avro](https://github.com/tall15421542-lab/ticket-master/tree/main/src/main/resources/avro)
-2. Run ``./mvnw generate-sources`` to generate the corresponding java classes.
+2. Run ``./mvnw generate-sources`` to generate the corresponding Java classes.
 
 ### Opentelemetry Configurations
-The following properties can configured by setting environment cariables or via the `-D` flag
-* `OTEL_EXPORTER_OTLP_ENDPOINT`: The jaeger endpoint.
-* `OTEL_SERVICE_NAME`: The service name including in the spans.
+The following properties can be configured by setting environment variables or via the `-D` flag
+* `OTEL_EXPORTER_OTLP_ENDPOINT`: The Jaeger endpoint.
+* `OTEL_SERVICE_NAME`: The service name included in the spans.
 * `OTEL_TRACES_SAMPLER`: The sampler described [here](https://opentelemetry.io/docs/languages/java/configuration/#properties-traces).
 * `OTEL_TRACES_SAMPLER_ARG`: Sampling rate described [here](https://opentelemetry.io/docs/languages/java/configuration/#properties-traces).
 
@@ -180,8 +180,8 @@ The following properties can configured by setting environment cariables or via 
 ```
 -XX:+UseZGC -XX:+ZGenerational -Xmx2G -Xms2G -XX:+AlwaysPreTouch
 ```
-To minimize pause times and ensure low latency, we recommend using the [Z Garbage Collector](https://docs.oracle.com/en/java/javase/24/gctuning/z-garbage-collector.html).
-* `-XX:+UseZGC -XX:+ZGenerational`: Configure JVM to use zgc.
+We recommend using the [Z Garbage Collector](https://docs.oracle.com/en/java/javase/24/gctuning/z-garbage-collector.html) to minimize pause times and ensure low latency.
+* `-XX:+UseZGC -XX:+ZGenerational`: Configure JVM to use ZGC.
 * `-Xmx2G -Xms2G`: Setting the same value to reduce time for memory allocation.
 * `-XX:+AlwaysPreTouch`: Page in memory before the application starts.
 
@@ -204,8 +204,8 @@ lab.tall15421542.app.ticket.Service -p 8080 -d ./tmp/ticket-service/ -n 0 \
 
 * `-n`: The maximum of virtual threads used by Jetty. `0` means unlimited.
 * `-p`: The HTTP port of the ticket service.
-* `-d`: Directory path for stroing state.
-* `-c`: Config file path for kafka and schema registry connectivity properties.
+* `-d`: Directory path for storing state.
+* `-c`: Config file path for Kafka and schema registry connectivity properties.
 * `-pc`: Config file path for [Kafka producer properties](https://docs.confluent.io/platform/current/installation/configuration/producer-configs.html).
 * `-sc`: Config file path for [Kafka Streams properties](https://docs.confluent.io/platform/current/installation/configuration/streams-configs.html).
 * `-r`: If present, enable the request log.
@@ -221,9 +221,9 @@ lab.tall15421542.app.reservation.Service \
 -sc appConfig/reservation-service/stream.properties \
 -d ./tmp/reservation-service
 ```
-* `-c`: Config file path for kafka and schema registry connectivity properties.
+* `-c`: Config file path for Kafka and schema registry connectivity properties.
 * `-sc`: Config file path for [Kafka Streams properties](https://docs.confluent.io/platform/current/installation/configuration/streams-configs.html).
-* `-d`: Directory path for stroing state.
+* `-d`: Directory path for storing state.
 ### Event Service
 ```
 java -javaagent:./otel/opentelemetry-javaagent.jar \
@@ -233,9 +233,9 @@ lab.tall15421542.app.event.Service \
 -sc appConfig/event-service/stream.properties \
 -d ./tmp/event-service
 ```
-* `-c`: Config file path for kafka and schema registry connectivity properties.
+* `-c`: Config file path for Kafka and schema registry connectivity properties.
 * `-sc`: Config file path for [Kafka Streams properties](https://docs.confluent.io/platform/current/installation/configuration/streams-configs.html).
-* `-d`: Directory path for stroing state.
+* `-d`: Directory path for storing state.
     
 ### Tracing - Jaeger
 open http://localhost:16686/
