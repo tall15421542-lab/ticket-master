@@ -65,6 +65,7 @@ public class Service {
         streamConfig.setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         streamConfig.setProperty(StreamsConfig.STATE_DIR_CONFIG, stateDir);
         streamConfig.setProperty(StreamsConfig.PROCESSING_GUARANTEE_CONFIG, "exactly_once_v2");
+        streamConfig.putIfAbsent(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, "20");
 
         KafkaStreams streams = new KafkaStreams(topology, streamConfig);
         streams.start();
@@ -99,7 +100,6 @@ public class Service {
                 Materialized.<String, Reservation, KeyValueStore<Bytes, byte[]>>as(Schemas.Stores.RESERVATION.name())
                         .withKeySerde(Schemas.Stores.RESERVATION.keySerde())
                         .withValueSerde(Schemas.Stores.RESERVATION.valueSerde())
-                        .withCachingDisabled()
         );
 
         KStream<String, ReservationResult> reservationResults = builder.stream(
