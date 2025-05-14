@@ -64,7 +64,6 @@ public class Service {
         streamConfig.setProperty(StreamsConfig.APPLICATION_ID_CONFIG, "reservation-service");
         streamConfig.setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         streamConfig.setProperty(StreamsConfig.STATE_DIR_CONFIG, stateDir);
-        streamConfig.setProperty(StreamsConfig.METRICS_RECORDING_LEVEL_CONFIG, "DEBUG");
         streamConfig.setProperty(StreamsConfig.PROCESSING_GUARANTEE_CONFIG, "exactly_once_v2");
 
         KafkaStreams streams = new KafkaStreams(topology, streamConfig);
