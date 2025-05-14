@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reservation-service-deployment
+  labels:
+    app: reservation-service 
+spec:
+  replicas: 1 
+  template:
+    metadata:
+      labels:
+        app: reservation-service 
+    spec:
+      containers:
+        - name: reservation-service
+          image: asia-east1-docker.pkg.dev/ticket-master-tall15421542/ticket-master/service:v0.0.23
+          resources:
+            requests:
+              memory: "2G"
+              cpu: "1000m"
+
