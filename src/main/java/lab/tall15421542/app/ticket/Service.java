@@ -228,6 +228,7 @@ public class Service extends Application {
         final Properties producerConfig = new Properties();
         producerConfig.putAll(defaultConfig);
         producerConfig.setProperty(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, "true");
+        producerConfig.setProperty(ProducerConfig.ACKS_CONFIG, "all");
         producerConfig.setProperty(ProducerConfig.CLIENT_ID_CONFIG, topic.name());
 
         return new KafkaProducer<>(producerConfig,
