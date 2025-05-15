@@ -18,13 +18,13 @@ spec:
           image: asia-east1-docker.pkg.dev/ticket-master-tall15421542/ticket-master/service:v0.0.23
           env:
             - name: JAVA_TOOL_OPTIONS
-              value: "-Xmx6554m -Xms6554m -XX:+AlwaysPreTouch"
+              value: "-Xmx14336m -Xms14336m -XX:+AlwaysPreTouch"
             - name: OTEL_TRACES_SAMPLER_ARG
-              value: '0.2'
+              value: '0.1'
           resources:
             requests:
-              memory: "8G"
-              cpu: "4000m"
+              memory: "16G"
+              cpu: "16000m"
           args: ["lab.tall15421542.app.ticket.Service",
                  "-c", "config/client.properties",
                  "-p", "8080",

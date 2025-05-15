@@ -16,6 +16,6 @@ spec:
           image: asia-east1-docker.pkg.dev/ticket-master-tall15421542/ticket-master/service:v0.0.23
           resources:
             requests:
-              memory: "2G"
-              cpu: "1000m"
+              memory: "4G"
+              cpu: "4000m"
 
