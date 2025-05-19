@@ -194,11 +194,12 @@ Use [maven-shade-plugin](https://maven.apache.org/plugins/maven-shade-plugin/ind
 ### Ticket Service
 ```
 java -javaagent:./otel/opentelemetry-javaagent.jar \
+-Dotel.service.name=ticket-service \
 -cp target/ticket-master-1.0-SNAPSHOT-shaded.jar \
 lab.tall15421542.app.ticket.Service -p 8080 -d ./tmp/ticket-service/ -n 0 \
 -c appConfig/client.dev.properties \
 -pc appConfig/ticket-service/producer.properties \
--sc appConfig/ticket-service/stream.properties \ 
+-sc appConfig/ticket-service/stream.properties \
 -r
 ```
 
@@ -215,6 +216,7 @@ lab.tall15421542.app.ticket.Service -p 8080 -d ./tmp/ticket-service/ -n 0 \
 ### Reservation Service
 ```
 java -javaagent:./otel/opentelemetry-javaagent.jar \
+-Dotel.service.name=reservation-service \
 -cp target/ticket-master-1.0-SNAPSHOT-shaded.jar \
 lab.tall15421542.app.reservation.Service \
 -c appConfig/client.dev.properties \
@@ -227,6 +229,7 @@ lab.tall15421542.app.reservation.Service \
 ### Event Service
 ```
 java -javaagent:./otel/opentelemetry-javaagent.jar \
+-Dotel.service.name=event-service \
 -cp target/ticket-master-1.0-SNAPSHOT-shaded.jar \
 lab.tall15421542.app.event.Service \
 -c appConfig/client.dev.properties \
@@ -241,4 +244,3 @@ lab.tall15421542.app.event.Service \
 open http://localhost:16686/
 ### Kafdrop
 open http://localhost:9000/
-
