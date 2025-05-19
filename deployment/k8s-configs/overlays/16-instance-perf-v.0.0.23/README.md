@@ -1,4 +1,4 @@
-# 40 instances Performance Report - v0.0.23
+# 16 instances Performance Report - v0.0.23
 # 🧪 Performance Test Report
 
 ## ⚙️ Setting
