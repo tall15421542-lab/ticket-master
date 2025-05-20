@@ -2,7 +2,7 @@
 
 ## Introduction
 
-**Ticket Master** is a high-performance ticket selling system capable of processing **[1,000,000 reservations within 16 seconds](https://github.com/tall15421542-lab/ticket-master/tree/main/deployment/k8s-configs/overlays/40-instance-perf)**.
+**Ticket Master** is a high-performance ticket selling system capable of processing **[1,000,000 reservations within 12 seconds](https://github.com/tall15421542-lab/ticket-master/tree/main/deployment/k8s-configs/overlays/32-instance-perf-v.0.0.23#server-side-trace-sampled-1)**.
 
 The system is built upon [Kafka Streams](https://kafka.apache.org/documentation/streams/), offering:
 
