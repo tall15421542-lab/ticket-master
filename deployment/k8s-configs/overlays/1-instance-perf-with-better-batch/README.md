@@ -140,6 +140,7 @@
 | **Avg**   | **0.771** | **1.740** | **1.834** | **0%**     |
 
 ![截圖 2025-05-17 凌晨12.01.27](https://hackmd.io/_uploads/rk9DWkS-eg.png)
+
 ![截圖 2025-05-17 凌晨12.01.54](https://hackmd.io/_uploads/HyFtZ1B-lx.png)
 
 
@@ -152,7 +153,6 @@
 | 4th round | 0.405   | 1.070   | 1.160   | 0%         |
 | 5th round | 0.175   | 0.895   | 1.010   | 0%         |
 | **Avg**   | **0.370** | **0.987** | **1.098** | **0%**     |
-
 
 ![截圖 2025-05-15 晚上8.33.50](https://hackmd.io/_uploads/Bk3N1DXWeg.png)
 ![截圖 2025-05-15 下午4.13.20](https://hackmd.io/_uploads/B1yNf77Zxl.png)
@@ -189,7 +189,7 @@ Larger batches, combined with LZ4 compression, improve both **network efficiency
 | Configuration        | Ticket | Reservation | Event | P50 (s) | P90 (s) | P95 (s) |
 |----------------------|--------|-------------|-------|---------|---------|---------|
 | **Baseline.  **      | 4 vCPU | 0.5 vCPU    | 0.5 vCPU  | 2.210   | 4.526   | 5.186   |
-| **2 MB batch (LZ4)** | 8 vCPU | 0.5 vCPU    | 0.5  vCPU | **1.416** | **3.429** | **3.857** |
+| **2 MB batch (LZ4)** | 4 vCPU | 0.5 vCPU    | 0.5  vCPU | **1.416** | **3.429** | **3.857** |
 | **Improvement**      |   –    |      –      |   –   | **-36%** | **-25%** | **-34%** |
 
 With bigger batch size, application reduces p50 and p99 by around 35%, and reduce p90 by around 25%.
