@@ -228,7 +228,7 @@ it becomes **CPU-bound**, unable to process reservation state updates in real ti
 | 8 vCPU               | 8 vCPU | 0.5 vCPU    | 0.5 vCPU  | **1.189** | **2.546** | **2.637** |
 | **Improvement**      |   –    |      –      |   –   | **-16%** | **-26%** | **-32%** |
 
-#### Performance Comparison with Increased Reservation/Event Resources
+### Performance Comparison with Increased Reservation/Event Resources
 
 | Configuration         | Ticket  | Reservation | Event | P50 (s) | P90 (s) | P95 (s) |
 |-----------------------|---------|-------------|-------|---------|---------|---------|
