@@ -293,14 +293,12 @@ public class Service extends Application {
             final AsyncResponse asyncResponse = asyncResponseWithMetadata.asyncResponse;
             final Context spanContext = asyncResponseWithMetadata.spanContext;
             if (asyncResponse.isSuspended()) {
-                virtualExecutor.submit(()-> {
-                    Span span = tracer.spanBuilder("async-handle-reservation").setParent(spanContext).startSpan();
-                    try (Scope ignored = span.makeCurrent()) {
-                        asyncResponse.resume(ReservationBean.fromAvro(reservation));
-                    } finally {
-                        span.end();
-                    }
-                });
+                Span span = tracer.spanBuilder("async-handle-reservation").setParent(spanContext).startSpan();
+                try (Scope ignored = span.makeCurrent()) {
+                    asyncResponse.resume(ReservationBean.fromAvro(reservation));
+                } finally {
+                    span.end();
+                }
             }
         });
 
