@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ticket-service-deployment
+  labels:
+    app: ticket-service 
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: ticket-service
+    spec:
+      securityContext:
+        runAsUser: 0
+      containers:
+        - name: ticket-service
+          image: asia-east1-docker.pkg.dev/ticket-master-tall15421542/ticket-master/service:v0.0.23
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: "-Xmx6554m -Xms6554m -XX:+AlwaysPreTouch"
+            - name: OTEL_TRACES_SAMPLER_ARG
+              value: '0.1'
+          resources:
+            requests:
+              memory: "12G"
+              cpu: "8000m"
+          command: ["java", "-javaagent:/opentelemetry-javaagent.jar","-Djava.security.manager=allow", "-cp", "app.jar"]
+          args: ["lab.tall15421542.app.ticket.Service",
+                 "-c", "config/client.properties",
+                 "-p", "8080",
+                 "-n", "0",
+                 "-h", "$(POD_IP)",
+                 "-pc", "producer-config/producer.properties",
+                 "-sc", "stream-config/stream.properties",
+          ]
