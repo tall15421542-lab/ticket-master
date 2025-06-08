@@ -25,7 +25,6 @@
     <ticket-service.main.class>lab.tall15421542.app.ticket.Service</ticket-service.main.class>
     <reservation-service.main.class>lab.tall15421542.app.reservation.Service</reservation-service.main.class>
     <event-service.main.class>lab.tall15421542.app.event.Service</event-service.main.class>
-    <logback.version>1.5.18</logback.version>
   </properties>
 
   <repositories>
@@ -195,10 +194,9 @@
 
     <!-- SLF4J Dependencies -->
     <dependency>
-      <groupId>ch.qos.logback</groupId>
-      <artifactId>logback-classic</artifactId>
-      <version>${logback.version}</version>
-      <scope>runtime</scope>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-simple</artifactId>
+      <version>2.0.7</version>
     </dependency>
 
     <!-- OpenTelemetry Dependencies -->
