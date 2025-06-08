@@ -365,9 +365,6 @@ class ServiceTest {
 
             ReservationBean rejectedReservationBean = asyncResponse.get().readEntity(ReservationBean.class);
             assertEquals(ReservationBean.fromAvro(notReadyReservation), rejectedReservationBean);
-
-            assertNull(service1.outstandingRequests.get(notReadyReservationId));
-            assertNull(service2.outstandingRequests.get(notReadyReservationId));
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         } catch (ExecutionException e) {

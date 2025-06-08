@@ -285,7 +285,7 @@ public class Service extends Application {
                         .withValueSerde(Schemas.Stores.RESERVATION.valueSerde()));
 
         reservationTable.toStream().foreach((reservationId, reservation) -> {
-            final AsyncResponseWithMetadata asyncResponseWithMetadata = outstandingRequests.remove(reservationId);
+            final AsyncResponseWithMetadata asyncResponseWithMetadata = outstandingRequests.get(reservationId);
             if(asyncResponseWithMetadata == null){
                 return;
             }
@@ -317,7 +317,6 @@ public class Service extends Application {
         asyncResponse.register(new CompletionCallback() {
             @Override
             public void onComplete(Throwable throwable) {
-                outstandingRequests.remove(reservationId);
             }
         });
 
@@ -412,7 +411,6 @@ public class Service extends Application {
             // Ensure reservation does not arrive just after null check but before putting the request to outstandingRequest.
             reservation = reservationStore().get(reservationId);
             if(reservation != null){
-                outstandingRequests.remove(reservationId);
                 asyncResponse.resume(ReservationBean.fromAvro(reservation));
             }
         }else{
