@@ -96,7 +96,7 @@ public class Service extends Application {
         this.hostname = hostname;
         this.port = port;
 
-        this.httpClient = createHttpClient();
+        this.httpClient = ClientBuilder.newBuilder().register(JacksonFeature.class).build();
     }
 
     public Client createHttpClient(){
