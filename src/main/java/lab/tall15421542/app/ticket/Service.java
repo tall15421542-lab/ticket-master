@@ -53,6 +53,7 @@ import org.glassfish.jersey.client.ClientConfig;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.jetty.connector.JettyConnectorProvider;
 import org.glassfish.jersey.jetty.connector.JettyHttpClientSupplier;
+import org.glassfish.jersey.server.ManagedAsync;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.servlet.ServletContainer;
 import org.slf4j.Logger;
@@ -310,6 +311,7 @@ public class Service extends Application {
     @GET
     @Path("/reservation/{reservation_id}")
     @Produces({MediaType.APPLICATION_JSON})
+    @ManagedAsync
     public void getReservationById(@SpanAttribute("reservation_id") @PathParam("reservation_id") final String reservationId,
                          @Suspended final AsyncResponse asyncResponse) {
         asyncResponse.setTimeout(10, TimeUnit.SECONDS);
@@ -321,19 +323,17 @@ public class Service extends Application {
             }
         });
 
-        virtualExecutor.submit( () -> {
-            try{
-                fetchReservation(asyncResponse, reservationId);
-            } catch(InvalidStateStoreException e){
-                logger.info("Invalid State Store exception {}", e.getMessage());
-                Response resp = Response.status(Response.Status.SERVICE_UNAVAILABLE)
-                                .entity(e.getMessage())
-                                .build();
-                asyncResponse.resume(resp);
-            } catch (Exception e) {
-                asyncResponse.resume(e);
-            }
-        });
+        try{
+            fetchReservation(asyncResponse, reservationId);
+        } catch(InvalidStateStoreException e){
+            logger.info("Invalid State Store exception {}", e.getMessage());
+            Response resp = Response.status(Response.Status.SERVICE_UNAVAILABLE)
+                            .entity(e.getMessage())
+                            .build();
+            asyncResponse.resume(resp);
+        } catch (Exception e) {
+            asyncResponse.resume(e);
+        }
     }
 
     @GET
@@ -370,20 +370,19 @@ public class Service extends Application {
     @Path("/event/{id}/reservation")
     @Consumes({MediaType.APPLICATION_JSON})
     @Produces({MediaType.TEXT_PLAIN})
+    @ManagedAsync
     public void createReservation(final CreateReservationBean createReservationBean,
                                   @Suspended final AsyncResponse asyncResponse){
         CreateReservation req = createReservationBean.toAvro();
         String reservationId = UUID.randomUUID().toString();
         ProducerRecord<String, CreateReservation> record = new ProducerRecord<>(
                 Schemas.Topics.COMMAND_RESERVATION_CREATE_RESERVATION.name(), reservationId, req);
-        virtualExecutor.submit(() -> {
-            try{
-                createReservationProducer.send(record);
-                asyncResponse.resume(reservationId);
-            } catch (Exception e){
-                asyncResponse.resume(e);
-            }
-        });
+        try{
+            createReservationProducer.send(record);
+            asyncResponse.resume(reservationId);
+        } catch (Exception e){
+            asyncResponse.resume(e);
+        }
     }
 
     private void fetchReservation(final AsyncResponse asyncResponse, final String reservationId) throws InvalidStateStoreException {
