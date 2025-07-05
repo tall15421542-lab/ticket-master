@@ -10,20 +10,20 @@ export const options = {
   scenarios: {
     stress: {
       executor: 'ramping-arrival-rate',
-      startRate: 1000,
+      startRate: 5000,
 
       timeUnit: '1s',
 
-      preAllocatedVUs: 1000,
+      preAllocatedVUs: 10000,
 
       stages: [
-        { target: 1000, duration: '5s' },
+        { target: 5000, duration: '5s' },
 
-        { target: 1500, duration: '5s' },
+        { target: 6000, duration: '5s' },
 
-        { target: 2000, duration: '1m' },
+        { target: 10000, duration: '1m' },
 
-        { target: 1000, duration: '5s' },
+        { target: 5000, duration: '5s' },
       ],
 
       gracefulStop: '10s',
