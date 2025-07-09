@@ -18,6 +18,7 @@ import (
 	"os"
 	"runtime"
 	"runtime/pprof"
+	"runtime/trace"
 	"slices"
 	"strconv"
 	"sync"
@@ -518,6 +519,12 @@ func main() {
 				Usage:   "write lock profile to `file`",
 				Aliases: []string{"lock"},
 			},
+			&cli.StringFlag{
+				Name:    "traceprofile",
+				Value:   "",
+				Usage:   "write trace profile to `file`",
+				Aliases: []string{"trace"},
+			},
 			&cli.BoolFlag{
 				Name:  "http2",
 				Value: false,
@@ -536,6 +543,7 @@ func main() {
 			memprofile := cmd.String("memprofile")
 			blockprofile := cmd.String("blockprofile")
 			lockprofile := cmd.String("lockprofile")
+			traceprofile := cmd.String("traceprofile")
 
 			if blockprofile != "" {
 				runtime.SetBlockProfileRate(1)
@@ -557,6 +565,17 @@ func main() {
 				defer pprof.StopCPUProfile()
 			}
 
+			if traceprofile != "" {
+				f, err := os.Create(traceprofile)
+				if err != nil {
+					log.Fatal("could not create Trace profile: ", err)
+				}
+				defer f.Close() // error handling omitted for example
+				if err := trace.Start(f); err != nil {
+					log.Fatalf("profile: could not start trace: %v", err)
+				}
+				defer trace.Stop()
+			}
 			var zapLogger *zap.Logger
 			if env == "dev" {
 				zapLogger, _ = zap.NewDevelopment()
