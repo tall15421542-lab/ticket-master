@@ -1,0 +1,26 @@
+commonLabels:
+  variant: 1-instance-perf
+resources:
+- ../../base
+patches:
+- path: ticket-service-deployment.yaml
+- path: reservation-service-deployment.yaml
+- path: event-service-deployment.yaml
+configMapGenerator:
+  - name: ticket-service.producer.properties
+    behavior: replace
+    files:
+      - appConfig/ticket-service/producer.properties
+  - name: ticket-service.stream.properties
+    behavior: replace
+    files:
+      - appConfig/ticket-service/stream.properties
+  - name: reservation-service.stream.properties
+    behavior: replace
+    files:
+      - appConfig/reservation-service/stream.properties
+  - name: event-service.stream.properties
+    behavior: replace
+    files:
+      - appConfig/event-service/stream.properties
+

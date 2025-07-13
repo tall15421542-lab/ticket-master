@@ -49,6 +49,26 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: status.podIP
+          - name: OTEL_METRIC_EXPORT_INTERVAL
+            value: '5000'
+          - name: OTEL_JMX_TARGET_SYSTEM
+            value: 'jetty'
+          - name: OTEL_INSTRUMENTATION_HTTP_SERVER_EMIT_EXPERIMENTAL_TELEMETRY
+            value: 'true'
+          - name: OTEL_RESOURCE_PROVIDERS_GCP_ENABLED
+            value: "true"
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: NAMESPACE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: CONTAINER_NAME
+            value: "asia-east1-docker.pkg.dev/ticket-master-tall15421542/ticket-master/service:latest"
+          - name: OTEL_RESOURCE_ATTRIBUTES
+            value: "k8s.pod.name=$(POD_NAME),k8s.namespace.name=$(NAMESPACE_NAME),k8s.container.name=$(CONTAINER_NAME)"
         command: ["java", "-javaagent:/opentelemetry-javaagent.jar","-Djava.security.manager=allow", "-XX:+UseZGC", "-XX:+ZGenerational", "-cp", "app.jar"]
         args: ["lab.tall15421542.app.ticket.Service", 
           "-c", "config/client.properties", 
