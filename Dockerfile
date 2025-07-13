@@ -9,7 +9,7 @@
 ################################################################################
 
 # Create a stage for resolving and downloading dependencies.
-FROM eclipse-temurin:23-jdk as deps
+FROM eclipse-temurin:24-jdk as deps
 
 WORKDIR /build
 
@@ -56,7 +56,7 @@ RUN --mount=type=bind,source=pom.xml,target=pom.xml \
 # most recent version of that tag when you build your Dockerfile.
 # If reproducibility is important, consider using a specific digest SHA, like
 # eclipse-temurin@sha256:99cede493dfd88720b610eb8077c8688d3cca50003d76d1d539b0efc8cca72b4.
-FROM eclipse-temurin:23-jre AS final
+FROM eclipse-temurin:24-jre AS final
 
 RUN apt-get update && apt-get install libjemalloc2
 # Create a non-privileged user that the app will run under.
@@ -74,7 +74,7 @@ USER appuser
 
 # Copy the executable from the "package" stage.
 COPY --from=package build/target/app.jar app.jar
-ADD --chown=appuser:appuser --chmod=777 https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v2.13.2/opentelemetry-javaagent.jar opentelemetry-javaagent.jar
+ADD --chown=appuser:appuser --chmod=777 https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v2.17.1/opentelemetry-javaagent.jar opentelemetry-javaagent.jar
 
 EXPOSE 8080
 
