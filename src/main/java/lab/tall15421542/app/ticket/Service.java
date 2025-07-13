@@ -49,6 +49,7 @@ import org.eclipse.jetty.http2.client.transport.HttpClientTransportOverHTTP2;
 import org.eclipse.jetty.http2.server.HTTP2CServerConnectionFactory;
 import org.eclipse.jetty.server.*;
 import org.eclipse.jetty.util.thread.VirtualThreadPool;
+import org.eclipse.jetty.jmx.MBeanContainer;
 import org.glassfish.jersey.client.ClientConfig;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.jetty.connector.JettyConnectorProvider;
@@ -62,6 +63,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.*;
+import java.lang.management.ManagementFactory;
 
 import static lab.tall15421542.app.utils.Utils.addShutdownHookAndBlock;
 import static org.glassfish.jersey.CommonProperties.USE_VIRTUAL_THREADS;
@@ -482,6 +484,10 @@ public class Service extends Application {
 
         final Server jettyServer = new Server(threadPool);
         jettyServer.setHandler(context);
+
+        MBeanContainer mbeanContainer = new MBeanContainer(ManagementFactory.getPlatformMBeanServer());
+        // Add MBeanContainer to the root component.
+        jettyServer.addBean(mbeanContainer);
 
         boolean enableRequestLog = (boolean) config.getOrDefault(ENABLE_REQUEST_LOG, false);
         if(enableRequestLog){
