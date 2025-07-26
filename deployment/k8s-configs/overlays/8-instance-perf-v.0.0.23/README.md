@@ -6,9 +6,6 @@
 
 * **Spike Test Client**:
   * Code: [main.go](https://github.com/tall15421542-lab/ticket-master/blob/v0.0.23/scripts/perf/go-client/main.go)  
-    ```bash
-    time go run main.go --host 10.140.0.30 -a 80 -env prod --http2 -n 200000 -c 4
-    ```
   * **Google Compute Engine**:
     * Machine Type: `n2`
     * vCPUs: `32`
@@ -31,28 +28,48 @@
   * Trace Sampling Rate: 2.5%
   * Sampler: `parentbased_traceidratio`
 
-## 200000 Reservations
-### Client-Observed Server Processing Time
-
-| Round     | P50 (s) | P95 (s) | P99 (s) | Error Rate | Completion Time |
-|-----------|---------|---------|---------|------------|-----------------|
-| 1st round | 0.229   | 0.513   | 0.671   | 0%         | 6.983           |
-| 2nd round | 0.238   | 0.511   | 0.665   | 0%         | 6.735           |
-| 3rd round | 0.271   | 0.667   | 0.665   | 0%         | 7.725           |
-| 4th round | 0.444   | 1.001   | 1.211   | 0%         | 8.820           |
-| 5th round | 0.455   | 0.909   | 1.085   | 0%         | 8.700           |
-| **Avg**   | **0.327** | **0.720** | **0.859** | **0%**     | **7.793**         |
-
+## 200000 Reservations - 80 Sections
 ### Server-Side Trace (Sampled)
-| Round     | P50 (s) | P90 (s) | P95 (s) | Error Rate |
-|-----------|---------|---------|---------|------------|
-| 1st round | 0.003   | 0.286   | 0.346   | 0%         |
-| 2nd round | 0.003   | 0.269   | 0.330   | 0%         |
-| 3rd round | 0.003   | 0.308   | 0.433   | 0%         |
-| 4th round | 0.001   | 0.228   | 0.321   | 0%         |
-| 5th round | 0.001   | 0.196   | 0.274   | 0%         |
-| **Avg**   | **0.002** | **0.257** | **0.341** | **0%**     |
+```bash
+time go run main.go --host 10.140.0.30 -a 80 -env prod --http2 -n 200000 -c 20
+```
 
+| Round     | P50 (s) | P90 (s) | P95 (s) | Error Rate | Completion Time |
+|-----------|---------|---------|---------|------------|-----------------|
+| 1st round | 0.009   | 0.595   | 0.735   | 0%         | 6.340           |
+| 2nd round | 0.001   | 0.265   | 0.478   | 0%         | 6.012           |
+| 3rd round | 0.002   | 0.197   | 0.347   | 0%         | 6.469           |
+| 4th round | 0.002   | 0.203   | 0.354   | 0%         | 6.228           |
+| 5th round | 0.002   | 0.193   | 0.310   | 0%         | 6.520           |
+| **Avg**   | **0.003** | **0.291** | **0.445** | **0%**     | **6.314**         |
 
-![截圖 2025-05-18 晚上9.45.25](https://hackmd.io/_uploads/HyHYNPPWex.png)
-![截圖 2025-05-18 晚上9.46.05](https://hackmd.io/_uploads/Hk2iVDD-lx.png)
+### Event service spans
+![截圖 2025-07-26 晚上11.06.20](https://hackmd.io/_uploads/B1Cg1dGvlg.png)
+* $588 \times 40 = 23520$ events flow to the event service.
+![截圖 2025-07-26 晚上11.13.09](https://hackmd.io/_uploads/rkXclufwlx.png)
+* $43 \times 40 = 1720$ events are processed by the random instance picked among 8 replicas.
+
+## 200000 Reservations - 1 Sections
+### Server-Side Trace (Sampled)
+```bash
+time go run main.go --host 10.140.0.30 -a 1 -env prod --http2 -n 200000 -c 20
+```
+
+| Round     | P50 (s) | P90 (s) | P95 (s) | Error Rate | Completion Time |
+|-----------|---------|---------|---------|------------|-----------------|
+| 1st round | 0.002   | 0.166   | 0.293   | 0%         | 6.170           |
+| 2nd round | 0.002   | 0.154   | 0.276   | 0%         | 6.127           |
+| 3rd round | 0.002   | 0.130   | 0.234   | 0%         | 6.383           |
+| 4th round | 0.002   | 0.161   | 0.253   | 0%         | 6.387           |
+| 5th round | 0.002   | 0.045   | 0.193   | 0%         | 5.966           |
+| **Avg**   | **0.002** | **0.131** | **0.250** | **0%**     | **6.207**         |
+
+![截圖 2025-07-26 晚上10.19.24](https://hackmd.io/_uploads/S13lEDMvel.png)
+![截圖 2025-07-26 晚上10.18.01](https://hackmd.io/_uploads/HJ8s7wMvgg.png)
+* $122 \times 40 = 4880$ events flow to the event service.
+* The workload is skewed - all events flow to a specific instance.
+
+## Conclustion
+* The completion time does not have much difference.
+* The instance under skewed workload processes around $4880$ events, around $2.4\%$ of all reservations. This small fraction explains why the completion time remains nearly unchanged — most reservations are handled by the ticket and reservation services, which do not experience workload skew.
+* More reservations are directly rejected by the reservation service under skewed workload, which explains the observed reduction in latency.
