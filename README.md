@@ -19,7 +19,7 @@ The system adopts a microservices-based stream processing architecture, consisti
 
 ## Infrastructure
 [Architecture Diagram](https://drive.google.com/file/d/1_QCGj6DDKWuhazEUyqC6ExoQuQ7zbD1F/view?usp=sharing)
-![Architecture Diagram](https://hackmd.io/_uploads/H1D3pq_egx.png)
+![Architecture Diagram](https://hackmd.io/_uploads/HyOMjqtwlg.png)
 
 ## Observability
 
