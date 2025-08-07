@@ -2,28 +2,34 @@
 
 ## Introduction
 
-**Ticket Master** is a high-performance ticket selling system capable of processing **[1,000,000 reservations within 12 seconds](https://github.com/tall15421542-lab/ticket-master/tree/main/deployment/k8s-configs/overlays/32-instance-perf-v.0.0.23#server-side-trace-sampled-1)**.
+**Ticket Master** is a high-performance ticket reservation system capable of processing **[1,000,000 reservations within 12 seconds](https://github.com/tall15421542-lab/ticket-master/tree/main/deployment/k8s-configs/overlays/32-instance-perf-v.0.0.23#server-side-trace-sampled-1)**.
 
-The system is built upon [Kafka Streams](https://kafka.apache.org/documentation/streams/), offering:
+The system is built on [Kafka Streams](https://kafka.apache.org/documentation/streams/), providing:
 
-- **Exactly-once Processing Semantics**: Guarantees correctness and consistency of reservations.
-- **Horizontal Scalability**: Seamlessly scales with Kafka topic partitions.
-- **Fault Tolerance**: Application state is backed up via changelogs topics in Kafka.
+- **Stateful Stream Processing**: Utilizes [RocksDB](https://github.com/facebook/rocksdb) as the state backend for efficient state read/write operations.  
+- **Exactly-Once Processing Semantics**: Ensures data consistency even in the presence of failures.  
+- **Horizontal Scalability**: Scales seamlessly with the number of Kafka topic partitions.  
+- **State Querying**: Supports [Interactive Queries](https://docs.confluent.io/platform/current/streams/developer-guide/interactive-queries.html) to directly access the application’s local state store.
 
-The system adopts a microservices-based stream processing architecture, consisting of:
+I published three Medium stories to introduce this system:
+* [Part 1: Dataflow Architecture](https://medium.com/@tall15421542/c6d0c792244a)
+* [Part 2: Data-Driven Optimizations](https://medium.com/@tall15421542/228c6a52e00a)
+* [Part 3: Infra, Observability, Load Test](https://medium.com/@tall15421542/6bb55b850c72)
 
-- **Ticket Service**: API gateway, receive user requests and pass to Kafka.
-- **Reservation Service**: Kafka Streams app that processes reservations with state management.
-- **Event Service**: Kafka Streams app that manages event creation and seat availability.
 
 
-## Infrastructure
+## Architecture
+The system adopts Dataflow architecture, originally introduced in [Designing Data-Intensive Applications](https://dataintensive.net/), consisting of:
+- **Ticket Service**: Acts as the API gateway, handling users’ HTTP requests and forwarding  reservation requests to the stream processing system.
+- **Reservation Service**: Kafka Streams application that manages the reservation state.
+- **Event Service**: Kafka Streams application that manages the event and section availability state.
+
 [Architecture Diagram](https://drive.google.com/file/d/1_QCGj6DDKWuhazEUyqC6ExoQuQ7zbD1F/view?usp=sharing)
 ![Architecture Diagram](https://hackmd.io/_uploads/HyOMjqtwlg.png)
 
 ## Observability
 
-### Traces
+### Traces / Metrics
 * Powered by [OpenTelemetry Java Agent](https://opentelemetry.io/docs/zero-code/java/agent/).
 * Collected via [OTLP Collector](https://github.com/GoogleCloudPlatform/otlp-k8s-ingest) and exported to Google Cloud Trace.
 
